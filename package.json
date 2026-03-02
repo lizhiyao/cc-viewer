@@ -66,6 +66,7 @@
     "vite": "^6.3.5"
   },
   "dependencies": {
+    "@xterm/addon-web-links": "^0.12.0",
     "node-pty": "^1.1.0",
     "ws": "^8.19.0"
   }
