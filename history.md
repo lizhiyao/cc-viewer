@@ -1,13 +1,5 @@
 # Changelog
 
-## 1.4.7 (2026-03-03)
-
-- Feat: support `http_proxy`/`https_proxy`/`all_proxy`/`no_proxy` environment variables for all outbound requests (proxy forwarding, translation, update checks)
-- Uses undici v7 `EnvHttpProxyAgent` + `setGlobalDispatcher` to make native `fetch()` respect proxy env vars
-- `ALL_PROXY`/`all_proxy` supported as fallback when `http_proxy`/`https_proxy` not set
-- Graceful degradation if undici fails to load
-- Node.js minimum version bumped to >= 20
-
 ## 1.4.6 (2026-03-03)
 
 - Fix: Native mode shell hook now passthrough non-API commands directly without ccv interception
