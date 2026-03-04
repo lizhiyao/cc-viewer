@@ -409,6 +409,8 @@ class TerminalPanel extends React.Component {
     this._vkStartX = touch.clientX;
     this._vkStartY = touch.clientY;
     this._vkMoved = false;
+    this._vkTarget = e.currentTarget;
+    this._vkTarget.classList.add(styles.virtualKeyPressed);
   };
 
   _vkTouchMove = (e) => {
@@ -423,6 +425,8 @@ class TerminalPanel extends React.Component {
 
   _vkTouchEnd = (seq, e) => {
     e.preventDefault(); // 阻止后续 ghost click
+    this._vkTarget?.classList.remove(styles.virtualKeyPressed);
+    this._vkTarget = null;
     if (!this._vkMoved) {
       this.handleVirtualKey(seq);
     }
