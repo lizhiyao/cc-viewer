@@ -204,6 +204,63 @@ export function resetWorkspace() {
 
 const MAX_LOG_SIZE = 300 * 1024 * 1024; // 300MB
 
+const SUBAGENT_SYSTEM_RE = /command execution specialist|file search specialist|planning specialist|general-purpose agent/i;
+
+/**
+ * 提取请求体中的 system prompt 文本
+ */
+function getSystemText(body) {
+  const system = body?.system;
+  if (typeof system === 'string') return system;
+  if (Array.isArray(system)) {
+    return system.map(s => (s && s.text) || '').join('');
+  }
+  return '';
+}
+
+/**
+ * 判断请求是否为 MainAgent（拦截器侧标记用）
+ * 与 contentFilter.js 保持一致的检测逻辑
+ */
+function isMainAgentRequest(body) {
+  if (!body?.system || !Array.isArray(body?.tools)) return false;
+
+  const sysText = getSystemText(body);
+
+  // 必须包含 MainAgent 身份标识
+  if (!sysText.includes('You are Claude Code')) return false;
+
+  // 排除 SubAgent
+  if (SUBAGENT_SYSTEM_RE.test(sysText)) return false;
+
+  // 新架构检测（v2.1.69+）：延迟工具加载机制
+  const isSystemArray = Array.isArray(body.system);
+  const hasToolSearch = body.tools.some(t => t.name === 'ToolSearch');
+
+  if (isSystemArray && hasToolSearch) {
+    // 检查第一条消息是否包含 <available-deferred-tools>
+    const messages = body.messages || [];
+    const firstMsgContent = messages.length > 0 ?
+      (typeof messages[0].content === 'string' ? messages[0].content :
+       Array.isArray(messages[0].content) ? messages[0].content.map(c => c.text || '').join('') : '') : '';
+    if (firstMsgContent.includes('<available-deferred-tools>')) {
+      return true;
+    }
+  }
+
+  // 旧架构检测：工具数量 > 10 且包含核心工具
+  if (body.tools.length > 10) {
+    const hasEdit = body.tools.some(t => t.name === 'Edit');
+    const hasBash = body.tools.some(t => t.name === 'Bash');
+    const hasTaskOrAgent = body.tools.some(t => t.name === 'Task' || t.name === 'Agent');
+    if (hasEdit && hasBash && hasTaskOrAgent) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function isPreflightEntry(entry) {
   if (entry.mainAgent || entry.isHeartbeat || entry.isCountTokens) return false;
   const body = entry.body || {};
@@ -527,18 +584,7 @@ export function setupInterceptor() {
           isStream: body?.stream === true,
           isHeartbeat: /\/api\/eval\/sdk-/.test(urlStr),
           isCountTokens: /\/messages\/count_tokens/.test(urlStr),
-          mainAgent: (() => {
-            if (!body?.system || !Array.isArray(body?.tools) || body.tools.length <= 10) return false;
-            if (!['Edit', 'Bash'].every(n => body.tools.some(t => t.name === n))) return false;
-            if (!body.tools.some(t => t.name === 'Task' || t.name === 'Agent')) return false;
-            const sysText = typeof body.system === 'string' ? body.system :
-              Array.isArray(body.system) ? body.system.map(s => s?.text || '').join('') : '';
-            // 正向：必须包含 MainAgent 身份标识
-            if (!sysText.includes('You are Claude Code')) return false;
-            // 排除 SubAgent（general-purpose 等也携带完整工具集）
-            if (/command execution specialist|file search specialist|planning specialist|general-purpose agent/i.test(sysText)) return false;
-            return true;
-          })()
+          mainAgent: isMainAgentRequest(body)
         };
       }
     } catch { }

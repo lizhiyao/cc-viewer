@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.17 (2026-03-05)
+
+- Refactor: MainAgent detection logic consolidated into dedicated functions
+- Feat: support Claude Code v2.1.69+ new architecture detection (ToolSearch + deferred tools)
+- Refactor: `interceptor.js` now uses `isMainAgentRequest()` for consistent MainAgent marking
+- Refactor: `contentFilter.js` enhanced with new architecture detection for accurate filtering
+- Fix: MainAgent detection now correctly identifies both old and new Claude Code architectures
+
 ## 1.4.16 (2026-03-04)
 
 - Feat: plugin system — load/unload/enable/disable plugins from `~/.claude/logs/plugins/` directory

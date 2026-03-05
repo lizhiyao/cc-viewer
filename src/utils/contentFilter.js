@@ -20,7 +20,7 @@ export function getSystemText(body) {
 
 /**
  * 判断请求是否为 MainAgent 请求。
- * 包含 interceptor 标记校验 + 旧日志回退检测，全局唯一入口。
+ * 包含 interceptor 标记校验 + 新旧架构检测，全局唯一入口。
  */
 export function isMainAgent(req) {
   if (!req) return false;
@@ -32,18 +32,40 @@ export function isMainAgent(req) {
     return true;
   }
 
-  // 回退检测：旧版 interceptor 未标记 mainAgent，但实际符合 MainAgent 特征
+  // 统一检测逻辑：支持新旧架构
   const body = req.body || {};
-  const tools = body.tools;
-  if (body.system && Array.isArray(tools) && tools.length > 10) {
-    const hasEdit = tools.some(t => t.name === 'Edit');
-    const hasBash = tools.some(t => t.name === 'Bash');
-    const hasTaskOrAgent = tools.some(t => t.name === 'Task' || t.name === 'Agent');
+  if (!body.system || !Array.isArray(body.tools)) return false;
+
+  const sysText = getSystemText(body);
+
+  // 必须包含 MainAgent 身份标识
+  if (!sysText.includes('You are Claude Code')) return false;
+
+  // 排除 SubAgent
+  if (SUBAGENT_SYSTEM_RE.test(sysText)) return false;
+
+  // 新架构检测（v2.1.69+）：延迟工具加载机制
+  const isSystemArray = Array.isArray(body.system);
+  const hasToolSearch = body.tools.some(t => t.name === 'ToolSearch');
+
+  if (isSystemArray && hasToolSearch) {
+    // 检查第一条消息是否包含 <available-deferred-tools>
+    const messages = body.messages || [];
+    const firstMsgContent = messages.length > 0 ?
+      (typeof messages[0].content === 'string' ? messages[0].content :
+       Array.isArray(messages[0].content) ? messages[0].content.map(c => c.text || '').join('') : '') : '';
+    if (firstMsgContent.includes('<available-deferred-tools>')) {
+      return true;
+    }
+  }
+
+  // 旧架构检测：工具数量 > 10 且包含核心工具
+  if (body.tools.length > 10) {
+    const hasEdit = body.tools.some(t => t.name === 'Edit');
+    const hasBash = body.tools.some(t => t.name === 'Bash');
+    const hasTaskOrAgent = body.tools.some(t => t.name === 'Task' || t.name === 'Agent');
     if (hasEdit && hasBash && hasTaskOrAgent) {
-      const sysText = getSystemText(body);
-      if (sysText.includes('You are Claude Code') && !SUBAGENT_SYSTEM_RE.test(sysText)) {
-        return true;
-      }
+      return true;
     }
   }
 
