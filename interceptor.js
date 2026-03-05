@@ -602,7 +602,14 @@ export function setupInterceptor() {
       }
     }
 
-    // 在发起请求前先写入一条无 response 的条目，让前端可以检测在途请求
+    // 生成唯一请求 ID，用于关联在途请求和完成请求
+    const requestId = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    if (requestEntry) {
+      requestEntry.requestId = requestId;
+      requestEntry.inProgress = true;  // 标记为在途请求
+    }
+
+    // 在发起请求前先写入一条未完成的条目，让前端可以检测在途请求
     if (requestEntry) {
       try {
         appendFileSync(LOG_FILE, JSON.stringify(requestEntry, null, 2) + '\n---\n');
@@ -667,9 +674,14 @@ export function setupInterceptor() {
                       // 直接使用组装后的 message 对象作为 response.body
                       // 如果组装失败（例如非标准 SSE），则使用原始流内容
                       requestEntry.response.body = assembledMessage || streamedContent;
+                      // 移除在途请求标记，保持原始报文
+                      delete requestEntry.inProgress;
+                      delete requestEntry.requestId;
                       appendFileSync(LOG_FILE, JSON.stringify(requestEntry, null, 2) + '\n---\n');
                     } catch (err) {
                       requestEntry.response.body = streamedContent.slice(0, 1000);
+                      delete requestEntry.inProgress;
+                      delete requestEntry.requestId;
                       appendFileSync(LOG_FILE, JSON.stringify(requestEntry, null, 2) + '\n---\n');
                     }
                     controller.close();
@@ -698,6 +710,8 @@ export function setupInterceptor() {
             headers: Object.fromEntries(response.headers.entries()),
             body: '[Streaming Response - Capture failed]'
           };
+          delete requestEntry.inProgress;
+          delete requestEntry.requestId;
           appendFileSync(LOG_FILE, JSON.stringify(requestEntry, null, 2) + '\n---\n');
         }
       } else {
@@ -719,9 +733,13 @@ export function setupInterceptor() {
             headers: Object.fromEntries(response.headers.entries()),
             body: responseData
           };
+          delete requestEntry.inProgress;
+          delete requestEntry.requestId;
 
           appendFileSync(LOG_FILE, JSON.stringify(requestEntry, null, 2) + '\n---\n');
         } catch (err) {
+          delete requestEntry.inProgress;
+          delete requestEntry.requestId;
           appendFileSync(LOG_FILE, JSON.stringify(requestEntry, null, 2) + '\n---\n');
         }
       }

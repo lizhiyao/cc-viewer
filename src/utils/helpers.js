@@ -329,7 +329,7 @@ export function getModelShort(model) {
 // ============== 请求过滤相关 ==============
 
 /**
- * 判断请求是否为相关请求（过滤掉心跳、token计数、eval/sdk 请求）
+ * 判断请求是否为相关请求（过滤掉心跳、token计数、eval/sdk 请求、在途请求、历史遗留的状态0请求）
  */
 export function isRelevantRequest(request) {
   const url = request?.url || '';
@@ -337,7 +337,9 @@ export function isRelevantRequest(request) {
     request.isHeartbeat ||
     request.isCountTokens ||
     /\/api\/eval\/sdk-/.test(url) ||
-    /\/messages\/count_tokens/.test(url)
+    /\/messages\/count_tokens/.test(url) ||
+    request.inProgress === true ||  // 过滤在途请求
+    (request.response && request.response.status === 0)  // 兼容历史日志：过滤状态为0的请求
   );
 }
 
