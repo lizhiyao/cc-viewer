@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.23 (2026-03-06)
+
+- Fix: file content view minimap now uses viewport height as reference when content fits in one screen, preventing content from being stretched across entire scroll area
+
 ## 1.4.22 (2026-03-06)
 
 - Fix: plugin enable/disable state now correctly displayed in UI when plugin defines custom `name` property different from filename

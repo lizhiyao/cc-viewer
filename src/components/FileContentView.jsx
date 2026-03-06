@@ -126,7 +126,8 @@ export default function FileContentView({ filePath, onClose }) {
   const drawMinimap = () => {
     const canvas = minimapCanvasRef.current;
     const wrap = minimapRef.current;
-    if (!canvas || !wrap) return;
+    const codeEl = codeScrollRef.current;
+    if (!canvas || !wrap || !codeEl) return;
     const dpr = window.devicePixelRatio || 1;
     const width = wrap.clientWidth;
     const height = wrap.clientHeight;
@@ -148,10 +149,18 @@ export default function FileContentView({ filePath, onClose }) {
     const count = lineCountRef.current;
     if (!count || !data.length) return;
 
+    // 检测内容是否需要滚动
+    const { scrollHeight, clientHeight } = codeEl;
+    const needsScroll = scrollHeight > clientHeight;
+
+    // 如果内容不需要滚动，使用 viewport 高度作为绘制范围
+    // 如果需要滚动，使用整个 minimap 容器高度作为绘制范围
+    const drawHeight = needsScroll ? height : Math.min(height, MINIMAP_VIEWPORT_HEIGHT);
+
     const innerPad = 4;
     const avail = Math.max(4, width - innerPad * 2);
     for (let i = 0; i < count; i += 1) {
-      const y = Math.floor((i / count) * height);
+      const y = Math.floor((i / count) * drawHeight);
       const intensity = data[i];
       if (intensity < 0.06) continue;
       const barWidth = Math.max(2, Math.floor(avail * intensity));
