@@ -1309,138 +1309,138 @@ async function setupTerminalWebSocket(httpServer) {
     };
 
     // 文件监控器：监控工作区目录变更（暂时禁用）
-    /*
-    let fileWatcher = null;
-    let fileWatchDebounceTimer = null;
-    let currentWatchPath = null;
-
+    // 以下代码已被注释掉，如需启用请取消注释
+    // let fileWatcher = null;
+    // let fileWatchDebounceTimer = null;
+    // let currentWatchPath = null;
+    //
     // 忽略规则：从统一的 IGNORED_PATTERNS 生成，并忽略所有隐藏目录
-    const ignoredPaths = [
-      ...Array.from(IGNORED_PATTERNS).map(p => `**/${p}/**`),
-      '**/.*/**',  // 忽略所有隐藏目录（.git, .Trash, .docker 等）
-    ];
-
+    // const ignoredPaths = [
+    //   ...Array.from(IGNORED_PATTERNS).map(p => '**/' + p + '/**'),
+    //   '**/.*/**',  // 忽略所有隐藏目录（.git, .Trash, .docker 等）
+    // ];
+    //
     // 启动文件监控
-    const startFileWatcher = (watchPath) => {
-      if (fileWatcher) {
-        fileWatcher.close();
-      }
-      currentWatchPath = watchPath;
-
-      try {
-        fileWatcher = chokidar.watch(watchPath, {
-          ignored: ignoredPaths,
-          persistent: true,
-          ignoreInitial: true, // 忽略初始扫描，只监控变更
-          awaitWriteFinish: {
-            stabilityThreshold: 100,
-            pollInterval: 50
-          }
-        });
-
-        // 监听 chokidar 错误事件，避免崩溃
-        fileWatcher.on('error', (error) => {
-          console.error('[CC Viewer] File watcher error:', error.message);
-          // 不要让错误导致进程崩溃，只记录日志
-        });
-
-        // 使用防抖避免频繁触发
-        fileWatcher.on('all', (eventType, path) => {
-          if (fileWatchDebounceTimer) {
-            clearTimeout(fileWatchDebounceTimer);
-          }
-
-          fileWatchDebounceTimer = setTimeout(() => {
-            console.log(`[CC Viewer] File change detected: ${eventType} - ${path}`);
-
-            // 广播文件变更事件给所有连接的客户端
-            const changeEvent = {
-              type: 'file-change',
-              eventType,
-              path,
-              watchPath: currentWatchPath
-            };
-
-            const clientCount = wss.clients.size;
-            console.log(`[CC Viewer] Broadcasting file-change to ${clientCount} client(s)`);
-
-            wss.clients.forEach((client) => {
-              if (client.readyState === 1) { // WebSocket.OPEN
-                try {
-                  client.send(JSON.stringify(changeEvent));
-                } catch (err) {
-                  console.error('[CC Viewer] Failed to send file-change event:', err.message);
-                }
-              }
-            });
-          }, 200); // 200ms 防抖延迟
-        });
-
-        console.log(`[CC Viewer] File watcher started for: ${watchPath}`);
-      } catch (err) {
-        console.error('[CC Viewer] Failed to start file watcher:', err.message);
-      }
-    };
-
+    // const startFileWatcher = (watchPath) => {
+    //   if (fileWatcher) {
+    //     fileWatcher.close();
+    //   }
+    //   currentWatchPath = watchPath;
+    //
+    //   try {
+    //     fileWatcher = chokidar.watch(watchPath, {
+    //       ignored: ignoredPaths,
+    //       persistent: true,
+    //       ignoreInitial: true, // 忽略初始扫描，只监控变更
+    //       awaitWriteFinish: {
+    //         stabilityThreshold: 100,
+    //         pollInterval: 50
+    //       }
+    //     });
+    //
+    //     监听 chokidar 错误事件，避免崩溃
+    //     fileWatcher.on('error', (error) => {
+    //       console.error('[CC Viewer] File watcher error:', error.message);
+    //       不要让错误导致进程崩溃，只记录日志
+    //     });
+    //
+    //     使用防抖避免频繁触发
+    //     fileWatcher.on('all', (eventType, path) => {
+    //       if (fileWatchDebounceTimer) {
+    //         clearTimeout(fileWatchDebounceTimer);
+    //       }
+    //
+    //       fileWatchDebounceTimer = setTimeout(() => {
+    //         console.log('[CC Viewer] File change detected: ' + eventType + ' - ' + path);
+    //
+    //         广播文件变更事件给所有连接的客户端
+    //         const changeEvent = {
+    //           type: 'file-change',
+    //           eventType,
+    //           path,
+    //           watchPath: currentWatchPath
+    //         };
+    //
+    //         const clientCount = wss.clients.size;
+    //         console.log('[CC Viewer] Broadcasting file-change to ' + clientCount + ' client(s)');
+    //
+    //         wss.clients.forEach((client) => {
+    //           if (client.readyState === 1) { // WebSocket.OPEN
+    //             try {
+    //               client.send(JSON.stringify(changeEvent));
+    //             } catch (err) {
+    //               console.error('[CC Viewer] Failed to send file-change event:', err.message);
+    //             }
+    //           }
+    //         });
+    //       }, 200); // 200ms 防抖延迟
+    //     });
+    //
+    //     console.log('[CC Viewer] File watcher started for: ' + watchPath);
+    //   } catch (err) {
+    //     console.error('[CC Viewer] Failed to start file watcher:', err.message);
+    //   }
+    // };
+    //
     // 停止文件监控
-    const stopFileWatcher = () => {
-      if (fileWatchDebounceTimer) {
-        clearTimeout(fileWatchDebounceTimer);
-        fileWatchDebounceTimer = null;
-      }
-      if (fileWatcher) {
-        fileWatcher.close();
-        fileWatcher = null;
-      }
-      currentWatchPath = null;
-    };
-
+    // const stopFileWatcher = () => {
+    //   if (fileWatchDebounceTimer) {
+    //     clearTimeout(fileWatchDebounceTimer);
+    //     fileWatchDebounceTimer = null;
+    //   }
+    //   if (fileWatcher) {
+    //     fileWatcher.close();
+    //     fileWatcher = null;
+    //   }
+    //   currentWatchPath = null;
+    // };
+    //
     // 监听 PTY 退出事件，停止文件监控（只在监控器运行时停止）
-    onPtyExit(() => {
-      if (fileWatcher && !fileWatcher.closed) {
-        stopFileWatcher();
-        console.log('[CC Viewer] File watcher stopped (PTY exited)');
-      }
-    });
-
+    // onPtyExit(() => {
+    //   if (fileWatcher && !fileWatcher.closed) {
+    //     stopFileWatcher();
+    //     console.log('[CC Viewer] File watcher stopped (PTY exited)');
+    //   }
+    // });
+    //
     // 初始化时检查是否有活跃的工作区
-    const workspace = getCurrentWorkspace();
-    if (workspace.running && workspace.cwd) {
-      startFileWatcher(workspace.cwd);
-    }
-
+    // const workspace = getCurrentWorkspace();
+    // if (workspace.running && workspace.cwd) {
+    //   startFileWatcher(workspace.cwd);
+    // }
+    //
     // 定期检查工作区状态，确保监控器在 PTY 启动后自动开始工作
-    const workspaceCheckInterval = setInterval(() => {
-      const currentWorkspace = getCurrentWorkspace();
-      const isRunning = currentWorkspace.running && currentWorkspace.cwd;
-
-      // 调试日志
-      if (process.env.CCV_DEBUG) {
-        console.log('[CC Viewer] Workspace check:', {
-          running: currentWorkspace.running,
-          cwd: currentWorkspace.cwd,
-          fileWatcher: fileWatcher ? (fileWatcher.closed ? 'closed' : 'active') : 'none',
-          currentWatchPath
-        });
-      }
-
-      // 如果 PTY 正在运行但监控器未启动，则启动监控器
-      if (isRunning && (!fileWatcher || fileWatcher.closed)) {
-        if (currentWatchPath !== currentWorkspace.cwd) {
-          console.log(`[CC Viewer] Starting file watcher for: ${currentWorkspace.cwd}`);
-          startFileWatcher(currentWorkspace.cwd);
-        }
-      }
-    }, 1000); // 每秒检查一次
-
+    // const workspaceCheckInterval = setInterval(() => {
+    //   const currentWorkspace = getCurrentWorkspace();
+    //   const isRunning = currentWorkspace.running && currentWorkspace.cwd;
+    //
+    //   调试日志
+    //   if (process.env.CCV_DEBUG) {
+    //     console.log('[CC Viewer] Workspace check:', {
+    //       running: currentWorkspace.running,
+    //       cwd: currentWorkspace.cwd,
+    //       fileWatcher: fileWatcher ? (fileWatcher.closed ? 'closed' : 'active') : 'none',
+    //       currentWatchPath
+    //     });
+    //   }
+    //
+    //   如果 PTY 正在运行但监控器未启动，则启动监控器
+    //   if (isRunning && (!fileWatcher || fileWatcher.closed)) {
+    //     if (currentWatchPath !== currentWorkspace.cwd) {
+    //       console.log('[CC Viewer] Starting file watcher for: ' + currentWorkspace.cwd);
+    //       startFileWatcher(currentWorkspace.cwd);
+    //     }
+    //   }
+    // }, 1000); // 每秒检查一次
+    //
     // 清理定时器
-    const originalClose = wss.close;
-    wss.close = function() {
-      clearInterval(workspaceCheckInterval);
-      stopFileWatcher();
-      return originalClose.call(this);
-    };
-    */
+    // const originalClose = wss.close;
+    // wss.close = function() {
+    //   clearInterval(workspaceCheckInterval);
+    //   stopFileWatcher();
+    //   return originalClose.call(this);
+    // };
+
 
     httpServer.on('upgrade', (req, socket, head) => {
       const pathname = new URL(req.url, `http://${req.headers.host}`).pathname;

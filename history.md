@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.25 (2026-03-06)
+
+- Fix: syntax error in commented code block causing server startup failure
+
 ## 1.4.24 (2026-03-06)
 
 - Chore: temporarily disable chokidar file watcher feature
