@@ -2,6 +2,8 @@ import React from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
+import { WebLinksAddon } from '@xterm/addon-web-links';
+import { Unicode11Addon } from '@xterm/addon-unicode11';
 import '@xterm/xterm/css/xterm.css';
 import { t } from '../i18n';
 import styles from './TerminalPanel.module.css';
@@ -43,6 +45,8 @@ class TerminalPanel extends React.Component {
       this.ws.close();
       this.ws = null;
     }
+    if (this._resizeDebounceTimer) clearTimeout(this._resizeDebounceTimer);
+    if (this._webglRecoveryTimer) clearTimeout(this._webglRecoveryTimer);
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
     }
@@ -67,24 +71,21 @@ class TerminalPanel extends React.Component {
         selectionBackground: '#264f78',
       },
       allowProposedApi: true,
-      scrollback: isMobile ? 500 : 1000,
+      scrollback: isMobile ? 2000 : 5000,
     });
 
     this.fitAddon = new FitAddon();
     this.terminal.loadAddon(this.fitAddon);
+    this.terminal.loadAddon(new WebLinksAddon());
+
+    const unicode11 = new Unicode11Addon();
+    this.terminal.loadAddon(unicode11);
+    this.terminal.unicode.activeVersion = '11';
+
     this.terminal.open(this.containerRef.current);
 
     // 启用 WebGL 渲染器，GPU 加速绘制，失败时自动回退 Canvas
-    try {
-      this.webglAddon = new WebglAddon();
-      this.webglAddon.onContextLoss(() => {
-        this.webglAddon?.dispose();
-        this.webglAddon = null;
-      });
-      this.terminal.loadAddon(this.webglAddon);
-    } catch {
-      this.webglAddon = null;
-    }
+    this._loadWebglAddon(false);
 
     // 写入节流：批量合并高频输出，避免逐条触发渲染
     this._writeBuffer = '';
@@ -284,6 +285,7 @@ class TerminalPanel extends React.Component {
     this.ws.onclose = () => {
       setTimeout(() => {
         if (this.containerRef.current) {
+          this.terminal?.reset();
           this.connectWebSocket();
         }
       }, 2000);
@@ -311,15 +313,38 @@ class TerminalPanel extends React.Component {
     if (isMobile) return;
 
     this.resizeObserver = new ResizeObserver(() => {
-      if (this.fitAddon && this.containerRef.current) {
-        try {
-          this.fitAddon.fit();
-          this.sendResize();
-        } catch {}
-      }
+      if (this._resizeDebounceTimer) clearTimeout(this._resizeDebounceTimer);
+      this._resizeDebounceTimer = setTimeout(() => {
+        this._resizeDebounceTimer = null;
+        if (this.fitAddon && this.containerRef.current) {
+          try {
+            this.fitAddon.fit();
+            this.sendResize();
+          } catch {}
+        }
+      }, 150);
     });
     if (this.containerRef.current) {
       this.resizeObserver.observe(this.containerRef.current);
+    }
+  }
+
+  _loadWebglAddon(isRetry) {
+    try {
+      this.webglAddon = new WebglAddon();
+      this.webglAddon.onContextLoss(() => {
+        this.webglAddon?.dispose();
+        this.webglAddon = null;
+        if (!isRetry) {
+          this._webglRecoveryTimer = setTimeout(() => {
+            this._webglRecoveryTimer = null;
+            this._loadWebglAddon(true);
+          }, 1000);
+        }
+      });
+      this.terminal.loadAddon(this.webglAddon);
+    } catch {
+      this.webglAddon = null;
     }
   }
 

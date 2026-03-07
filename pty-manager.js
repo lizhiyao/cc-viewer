@@ -11,6 +11,18 @@ let lastExitCode = null;
 let outputBuffer = '';
 let currentWorkspacePath = null;
 const MAX_BUFFER = 200000;
+let batchBuffer = '';
+let batchScheduled = false;
+
+function flushBatch() {
+  batchScheduled = false;
+  if (!batchBuffer) return;
+  const chunk = batchBuffer;
+  batchBuffer = '';
+  for (const cb of dataListeners) {
+    try { cb(chunk); } catch {}
+  }
+}
 
 function fixSpawnHelperPermissions() {
   try {
@@ -77,12 +89,15 @@ export async function spawnClaude(proxyPort, cwd, extraArgs = [], claudePath = n
     if (outputBuffer.length > MAX_BUFFER) {
       outputBuffer = outputBuffer.slice(-MAX_BUFFER);
     }
-    for (const cb of dataListeners) {
-      try { cb(data); } catch {}
+    batchBuffer += data;
+    if (!batchScheduled) {
+      batchScheduled = true;
+      setImmediate(flushBatch);
     }
   });
 
   ptyProcess.onExit(({ exitCode }) => {
+    flushBatch();
     lastExitCode = exitCode;
     ptyProcess = null;
     currentWorkspacePath = null;
@@ -108,6 +123,9 @@ export function resizePty(cols, rows) {
 
 export function killPty() {
   if (ptyProcess) {
+    flushBatch();
+    batchBuffer = '';
+    batchScheduled = false;
     try { ptyProcess.kill(); } catch {}
     ptyProcess = null;
   }

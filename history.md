@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.30 (2026-03-07)
+
+- Perf: increase scrollback buffer (mobile 500→2000, desktop 1000→5000) for long Claude sessions
+- Feat: enable WebLinksAddon — URLs in terminal output are now clickable
+- Perf: ResizeObserver debounce (150ms) to reduce excessive fit/resize calls during window drag
+- Fix: call terminal.reset() before WebSocket reconnect to prevent duplicate content from replayed history buffer
+- Perf: server-side PTY output batching via setImmediate — merges multiple onData events per I/O cycle into a single WebSocket message
+- Fix: WebGL context loss recovery — auto-retry once after 1s instead of permanent Canvas fallback
+- Feat: Unicode11 Addon for correct CJK character width — fixes cursor misalignment and column rendering for Chinese/Japanese/Korean text
+- Chore: move @xterm/addon-web-links from dependencies to devDependencies (bundled by Vite)
+
 ## 1.4.29 (2026-03-07)
 
 - Fix: conversation area not refreshing after workspace switch due to race condition between SSE full_reload animation and HTTP response callback
