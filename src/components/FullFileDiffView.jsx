@@ -23,6 +23,7 @@ import bash from 'highlight.js/lib/languages/bash';
 import sql from 'highlight.js/lib/languages/sql';
 import 'highlight.js/styles/github-dark.css';
 import styles from './FullFileDiffView.module.css';
+import DiffMiniMap from './DiffMiniMap';
 
 // 注册语言
 hljs.registerLanguage('javascript', javascript);
@@ -90,53 +91,41 @@ function getLanguage(filePath) {
   return LANG_MAP[ext] || null;
 }
 
-function computeLineChanges(oldStr, newStr) {
+function highlightLines(content, lang) {
+  if (!content) return [];
+  const lines = content.split('\n');
+  if (lang) {
+    try {
+      const highlighted = hljs.highlight(content, { language: lang });
+      return highlighted.value.split('\n');
+    } catch {
+      return lines;
+    }
+  }
+  return lines;
+}
+
+function computeDiffLines(oldStr, newStr) {
   const changes = Diff.diffLines(oldStr, newStr);
-  const changeMap = new Map(); // lineNum -> { type, oldContent }
-  let newLineNum = 1;
+  const lines = [];
   let oldLineNum = 1;
+  let newLineNum = 1;
 
   for (const part of changes) {
     const partLines = part.value.replace(/\n$/, '').split('\n');
     if (part.value === '') continue;
 
-    if (part.added) {
-      // 新增的行
-      for (let i = 0; i < partLines.length; i++) {
-        changeMap.set(newLineNum++, { type: 'add', oldContent: null });
+    for (const text of partLines) {
+      if (part.added) {
+        lines.push({ type: 'add', oldNum: null, newNum: newLineNum++, text, oldIdx: null, newIdx: lines.filter(l => l.type !== 'del').length });
+      } else if (part.removed) {
+        lines.push({ type: 'del', oldNum: oldLineNum++, newNum: null, text, oldIdx: null, newIdx: null });
+      } else {
+        lines.push({ type: 'context', oldNum: oldLineNum++, newNum: newLineNum++, text, oldIdx: null, newIdx: null });
       }
-    } else if (part.removed) {
-      // 删除的行 - 记录下来，可能与后续的添加行配对
-      const removedLines = partLines;
-      oldLineNum += removedLines.length;
-
-      // 检查下一个 part 是否是添加，如果是则配对为修改
-      const nextPartIdx = changes.indexOf(part) + 1;
-      if (nextPartIdx < changes.length && changes[nextPartIdx].added) {
-        const addedLines = changes[nextPartIdx].value.replace(/\n$/, '').split('\n');
-        const minLen = Math.min(removedLines.length, addedLines.length);
-
-        // 配对的行标记为修改
-        for (let i = 0; i < minLen; i++) {
-          changeMap.set(newLineNum++, { type: 'modify', oldContent: removedLines[i] });
-        }
-
-        // 剩余的添加行标记为新增
-        for (let i = minLen; i < addedLines.length; i++) {
-          changeMap.set(newLineNum++, { type: 'add', oldContent: null });
-        }
-
-        // 跳过下一个 part（已处理）
-        changes.splice(nextPartIdx, 1);
-      }
-    } else {
-      // 未变更的行
-      newLineNum += partLines.length;
-      oldLineNum += partLines.length;
     }
   }
-
-  return changeMap;
+  return lines;
 }
 
 export default function FullFileDiffView({ file_path, old_string, new_string }) {
@@ -157,86 +146,106 @@ export default function FullFileDiffView({ file_path, old_string, new_string }) 
   const isDeleted = !new_string || new_string.trim() === '';
   const isNew = !old_string || old_string.trim() === '';
 
-  const changeMap = useMemo(
-    () => {
-      if (isDeleted || isNew) {
-        // 对于新增或删除的文件，不需要计算 diff
-        return new Map();
-      }
-      return computeLineChanges(old_string, new_string);
-    },
-    [old_string, new_string, isDeleted, isNew]
-  );
-
-  // 对于删除的文件，显示旧内容；否则显示新内容
-  const displayContent = isDeleted ? old_string : new_string;
-  const displayLines = displayContent.split('\n');
   const lang = getLanguage(file_path);
 
-  // 高亮代码
-  const highlightedLines = useMemo(() => {
-    if (lang) {
-      try {
-        const highlighted = hljs.highlight(displayContent, { language: lang });
-        return highlighted.value.split('\n');
-      } catch {
-        return displayLines;
-      }
-    }
-    return displayLines;
-  }, [displayContent, lang, displayLines]);
+  // 分别高亮旧内容和新内容
+  const oldHighlightedLines = useMemo(
+    () => highlightLines(old_string || '', lang),
+    [old_string, lang]
+  );
+  const newHighlightedLines = useMemo(
+    () => highlightLines(new_string || '', lang),
+    [new_string, lang]
+  );
 
-  const addedCount = isNew ? displayLines.length : Array.from(changeMap.values()).filter(c => c.type === 'add').length;
-  const modifiedCount = Array.from(changeMap.values()).filter(c => c.type === 'modify').length;
-  const deletedCount = isDeleted ? displayLines.length : 0;
+  // 计算 unified diff 行
+  const diffLines = useMemo(() => {
+    if (isNew) {
+      // 新文件：所有行都是 add
+      const lines = (new_string || '').split('\n');
+      return lines.map((text, i) => ({
+        type: 'add', oldNum: null, newNum: i + 1, text
+      }));
+    }
+    if (isDeleted) {
+      // 删除文件：所有行都是 del
+      const lines = (old_string || '').split('\n');
+      return lines.map((text, i) => ({
+        type: 'del', oldNum: i + 1, newNum: null, text
+      }));
+    }
+    return computeDiffLines(old_string, new_string);
+  }, [old_string, new_string, isDeleted, isNew]);
+
+  // 将高亮行映射到 diff 行
+  const highlightedDiffLines = useMemo(() => {
+    let oldIdx = 0;
+    let newIdx = 0;
+    return diffLines.map(dl => {
+      let html;
+      if (dl.type === 'del') {
+        html = oldHighlightedLines[oldIdx] ?? '';
+        oldIdx++;
+      } else if (dl.type === 'add') {
+        html = newHighlightedLines[newIdx] ?? '';
+        newIdx++;
+      } else {
+        // context: advance both
+        html = newHighlightedLines[newIdx] ?? '';
+        oldIdx++;
+        newIdx++;
+      }
+      return { ...dl, html };
+    });
+  }, [diffLines, oldHighlightedLines, newHighlightedLines]);
+
+  const addedCount = highlightedDiffLines.filter(l => l.type === 'add').length;
+  const deletedCount = highlightedDiffLines.filter(l => l.type === 'del').length;
 
   return (
     <div className={styles.fullFileDiffView}>
       <div className={styles.diffSummary}>
         {addedCount > 0 && <span className={styles.addedBadge}>+{addedCount}</span>}
-        {modifiedCount > 0 && <span className={styles.modifiedBadge}>~{modifiedCount}</span>}
         {deletedCount > 0 && <span className={styles.deletedBadge}>-{deletedCount}</span>}
       </div>
       <div className={styles.codeContainer}>
         <div className={styles.lineNumberCol} ref={lineNumScrollRef}>
-          {highlightedLines.map((_, idx) => {
-            const lineNum = idx + 1;
-            const change = changeMap.get(lineNum);
+          {highlightedDiffLines.map((dl, idx) => {
             let numClass = styles.lineNumNormal;
-            if (isDeleted) numClass = styles.lineNumDelete;
-            else if (isNew) numClass = styles.lineNumAdd;
-            else if (change) numClass = change.type === 'add' ? styles.lineNumAdd : styles.lineNumModify;
-            return <div key={idx} className={numClass}>{lineNum}</div>;
+            if (dl.type === 'add') numClass = styles.lineNumAdd;
+            else if (dl.type === 'del') numClass = styles.lineNumDelete;
+            return (
+              <div key={idx} className={`${styles.lineNumRow} ${numClass}`}>
+                <span className={styles.oldLineNum}>{dl.oldNum ?? ''}</span>
+                <span className={styles.newLineNum}>{dl.newNum ?? ''}</span>
+              </div>
+            );
           })}
         </div>
-        <div className={styles.codeCol} ref={codeScrollRef}>
-          <div className={styles.codeInner}>
-            {highlightedLines.map((line, idx) => {
-              const lineNum = idx + 1;
-              const change = changeMap.get(lineNum);
+        <div className={styles.codeColWrap}>
+          <div className={styles.codeCol} ref={codeScrollRef}>
+            <div className={styles.codeInner}>
+              {highlightedDiffLines.map((dl, idx) => {
+                let lineClass;
+                if (dl.type === 'add') lineClass = styles.lineAdd;
+                else if (dl.type === 'del') lineClass = styles.lineDelete;
+                else lineClass = styles.lineNormal;
 
-              let lineClass;
-              if (isDeleted) lineClass = styles.lineDelete;
-              else if (isNew) lineClass = styles.lineAdd;
-              else if (change) lineClass = change.type === 'add' ? styles.lineAdd : styles.lineModify;
-              else lineClass = styles.lineNormal;
+                const prefix = dl.type === 'add' ? '+' : dl.type === 'del' ? '-' : ' ';
 
-              return (
-                <div key={idx} className={`${styles.codeLine} ${lineClass}`}>
-                  <span
-                    className={styles.lineContent}
-                    dangerouslySetInnerHTML={{ __html: line || ' ' }}
-                  />
-                  {change && change.oldContent !== null && (
-                    <div className={styles.oldContentTooltip}>
-                      <div className={styles.tooltipLabel}>原内容:</div>
-                      <div className={styles.tooltipContent}>{change.oldContent}</div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                return (
+                  <div key={idx} className={`${styles.codeLine} ${lineClass}`}>
+                    <span className={styles.linePrefix}>{prefix}</span>
+                    <span
+                      className={styles.lineContent}
+                      dangerouslySetInnerHTML={{ __html: dl.html || ' ' }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
+          <DiffMiniMap diffLines={highlightedDiffLines} scrollRef={codeScrollRef} />
         </div>
       </div>
     </div>

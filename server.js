@@ -621,8 +621,18 @@ async function handleRequest(req, res) {
     }
 
     const entries = readLogFile();
-    // 初始化时发送 full_reload 事件（而非逐条发送），让前端可以批量处理时间戳
-    res.write(`event: full_reload\ndata: ${JSON.stringify(entries)}\n\n`);
+    // 分段发送：先告知总数，再分块传输，让前端能显示真实加载进度
+    const CHUNK_SIZE = 50;
+    if (entries.length > CHUNK_SIZE) {
+      res.write(`event: load_start\ndata: ${JSON.stringify({ total: entries.length })}\n\n`);
+      for (let i = 0; i < entries.length; i += CHUNK_SIZE) {
+        const chunk = entries.slice(i, i + CHUNK_SIZE);
+        res.write(`event: load_chunk\ndata: ${JSON.stringify(chunk)}\n\n`);
+      }
+      res.write(`event: load_end\ndata: {}\n\n`);
+    } else {
+      res.write(`event: full_reload\ndata: ${JSON.stringify(entries)}\n\n`);
+    }
 
     req.on('close', () => {
       clients = clients.filter(client => client !== res);

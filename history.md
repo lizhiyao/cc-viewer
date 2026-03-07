@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.31 (2026-03-07)
+
+- Feat: FullFileDiffView unified diff — dual line numbers (old | new), deleted lines shown inline with strikethrough instead of tooltip
+- Feat: diff minimap — 10px color-coded change indicator on scrollbar right side, click to navigate, auto-hidden when content fits in viewport
+- Perf: SSE chunked loading — server sends large log files in 50-entry chunks with progress events instead of single full_reload
+- Feat: client-side chunked loading progress indicator during initial data load
+
 ## 1.4.30 (2026-03-07)
 
 - Perf: increase scrollback buffer (mobile 500→2000, desktop 1000→5000) for long Claude sessions

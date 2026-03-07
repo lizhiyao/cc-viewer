@@ -57,6 +57,8 @@ class App extends React.Component {
     };
     this.eventSource = null;
     this._autoSelectTimer = null;
+    this._chunkedEntries = [];   // 分段加载缓冲
+    this._chunkedTotal = 0;
     this.mainContainerRef = React.createRef();
   }
 
@@ -179,6 +181,42 @@ class App extends React.Component {
           const data = JSON.parse(event.data);
           this.setState({ updateInfo: { type: 'major', version: data.version } });
         } catch { }
+      });
+      this.eventSource.addEventListener('load_start', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          this._chunkedEntries = [];
+          this._chunkedTotal = data.total || 0;
+          this.setState({ fileLoading: true, fileLoadingCount: 0 });
+        } catch { }
+      });
+      this.eventSource.addEventListener('load_chunk', (event) => {
+        try {
+          const chunk = JSON.parse(event.data);
+          if (Array.isArray(chunk)) {
+            this._chunkedEntries.push(...chunk);
+            this.setState({ fileLoadingCount: this._chunkedEntries.length });
+          }
+        } catch { }
+      });
+      this.eventSource.addEventListener('load_end', () => {
+        const entries = this._chunkedEntries;
+        this._chunkedEntries = [];
+        this._chunkedTotal = 0;
+        if (Array.isArray(entries) && entries.length > 0) {
+          this.assignMessageTimestamps(entries);
+          const mainAgentSessions = this.buildSessionsFromEntries(entries);
+          const filtered = filterRelevantRequests(entries);
+          this.setState({
+            requests: entries,
+            selectedIndex: filtered.length > 0 ? filtered.length - 1 : null,
+            mainAgentSessions,
+            fileLoading: false,
+            fileLoadingCount: 0,
+          });
+        } else {
+          this.setState({ fileLoading: false, fileLoadingCount: 0 });
+        }
       });
       this.eventSource.addEventListener('full_reload', (event) => {
         try {
@@ -868,6 +906,11 @@ class App extends React.Component {
               </div>
             </div>
             <div className={`${styles.mobileChatOverlay} ${this.state.mobileChatVisible ? styles.mobileChatOverlayVisible : ''}`}>
+              {fileLoading && (
+                <div className={styles.loadingOverlay}>
+                  <div className={styles.loadingText}>Loading...({fileLoadingCount})</div>
+                </div>
+              )}
               <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: { colorBgContainer: '#111', colorBgLayout: '#0a0a0a', colorBgElevated: '#1a1a1a', colorBorder: '#2a2a2a' } }}>
                 <div className={styles.mobileChatInner}>
                   <ChatView
