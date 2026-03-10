@@ -867,6 +867,47 @@ async function handleRequest(req, res) {
     return;
   }
 
+  // 保存文件内容 API
+  if (url === '/api/file-content' && method === 'POST') {
+    const MAX_BODY = 5 * 1024 * 1024; // 5MB，与 GET 路由限制对齐
+    let body = '';
+    let overflow = false;
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > MAX_BODY) { overflow = true; req.destroy(); }
+    });
+    req.on('end', () => {
+      if (overflow) {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Request body too large' }));
+        return;
+      }
+      try {
+        const { path: reqPath, content } = JSON.parse(body);
+        if (!reqPath || reqPath.startsWith('/') || reqPath.includes('..')) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid path' }));
+          return;
+        }
+        if (typeof content !== 'string') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Content must be a string' }));
+          return;
+        }
+        const cwd = process.env.CCV_PROJECT_DIR || process.cwd();
+        const targetFile = join(cwd, reqPath);
+        writeFileSync(targetFile, content, 'utf-8');
+        const stat = statSync(targetFile);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, size: stat.size }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: `Cannot save file: ${err.message}` }));
+      }
+    });
+    return;
+  }
+
   // CLI 模式检测
   if (url === '/api/cli-mode' && method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });

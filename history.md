@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.11 (2026-03-10)
+
+- Feat: migrate FileContentView from highlight.js to CodeMirror 6 — full-featured code editor with syntax highlighting, editing, and save support
+- Feat: add CodeMirror minimap extension — provides code overview with optimized settings (characters display, mouse-over overlay)
+- Feat: file editing and saving — Ctrl+S hotkey support, auto-save status indicator, POST /api/file-content endpoint
+- Improve: custom line number gutter — external line numbers with scroll sync, allowing minimap to display properly
+- i18n: add ui.save, ui.saving, ui.saved, ui.saveFailed, ui.unsavedChanges across all 17 languages
+
 ## 1.5.10 (2026-03-09)
 
 - Feat: mobile user prompt viewer — add "用户Prompt" menu item in mobile hamburger menu, fully aligned with PC's original mode implementation

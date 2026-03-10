@@ -1,93 +1,61 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import hljs from 'highlight.js/lib/core';
-import javascript from 'highlight.js/lib/languages/javascript';
-import typescript from 'highlight.js/lib/languages/typescript';
-import python from 'highlight.js/lib/languages/python';
-import java from 'highlight.js/lib/languages/java';
-import cpp from 'highlight.js/lib/languages/cpp';
-import csharp from 'highlight.js/lib/languages/csharp';
-import go from 'highlight.js/lib/languages/go';
-import rust from 'highlight.js/lib/languages/rust';
-import php from 'highlight.js/lib/languages/php';
-import ruby from 'highlight.js/lib/languages/ruby';
-import swift from 'highlight.js/lib/languages/swift';
-import kotlin from 'highlight.js/lib/languages/kotlin';
-import css from 'highlight.js/lib/languages/css';
-import scss from 'highlight.js/lib/languages/scss';
-import xml from 'highlight.js/lib/languages/xml';
-import json from 'highlight.js/lib/languages/json';
-import yaml from 'highlight.js/lib/languages/yaml';
-import markdown from 'highlight.js/lib/languages/markdown';
-import bash from 'highlight.js/lib/languages/bash';
-import sql from 'highlight.js/lib/languages/sql';
-import 'highlight.js/styles/github-dark.css';
-import { t } from '../i18n';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import CodeMirror from '@uiw/react-codemirror';
+import { EditorView } from '@codemirror/view';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { tags as t } from '@lezer/highlight';
+import { showMinimap } from '@replit/codemirror-minimap';
+import { javascript } from '@codemirror/lang-javascript';
+import { python } from '@codemirror/lang-python';
+import { java } from '@codemirror/lang-java';
+import { cpp } from '@codemirror/lang-cpp';
+import { rust } from '@codemirror/lang-rust';
+import { php } from '@codemirror/lang-php';
+import { xml } from '@codemirror/lang-xml';
+import { json } from '@codemirror/lang-json';
+import { yaml } from '@codemirror/lang-yaml';
+import { markdown } from '@codemirror/lang-markdown';
+import { css } from '@codemirror/lang-css';
+import { sql } from '@codemirror/lang-sql';
+import { go } from '@codemirror/lang-go';
+import { keymap } from '@codemirror/view';
+import { t as i18n } from '../i18n';
 import styles from './FileContentView.module.css';
 
-// 注册语言
-hljs.registerLanguage('javascript', javascript);
-hljs.registerLanguage('typescript', typescript);
-hljs.registerLanguage('python', python);
-hljs.registerLanguage('java', java);
-hljs.registerLanguage('cpp', cpp);
-hljs.registerLanguage('csharp', csharp);
-hljs.registerLanguage('go', go);
-hljs.registerLanguage('rust', rust);
-hljs.registerLanguage('php', php);
-hljs.registerLanguage('ruby', ruby);
-hljs.registerLanguage('swift', swift);
-hljs.registerLanguage('kotlin', kotlin);
-hljs.registerLanguage('css', css);
-hljs.registerLanguage('scss', scss);
-hljs.registerLanguage('xml', xml);
-hljs.registerLanguage('json', json);
-hljs.registerLanguage('yaml', yaml);
-hljs.registerLanguage('markdown', markdown);
-hljs.registerLanguage('bash', bash);
-hljs.registerLanguage('sql', sql);
-
 const LANG_MAP = {
-  js: 'javascript',
-  jsx: 'javascript',
-  ts: 'typescript',
-  tsx: 'typescript',
-  py: 'python',
-  java: 'java',
-  c: 'cpp',
-  cpp: 'cpp',
-  cc: 'cpp',
-  cxx: 'cpp',
-  h: 'cpp',
-  hpp: 'cpp',
-  cs: 'csharp',
-  go: 'go',
-  rs: 'rust',
-  php: 'php',
-  rb: 'ruby',
-  swift: 'swift',
-  kt: 'kotlin',
-  css: 'css',
-  scss: 'scss',
-  sass: 'scss',
-  less: 'css',
-  html: 'xml',
-  htm: 'xml',
-  xml: 'xml',
-  svg: 'xml',
-  json: 'json',
-  yml: 'yaml',
-  yaml: 'yaml',
-  md: 'markdown',
-  markdown: 'markdown',
-  sh: 'bash',
-  bash: 'bash',
-  zsh: 'bash',
-  sql: 'sql',
+  js: javascript,
+  jsx: javascript,
+  ts: javascript,
+  tsx: javascript,
+  py: python,
+  java: java,
+  c: cpp,
+  cpp: cpp,
+  cc: cpp,
+  cxx: cpp,
+  h: cpp,
+  hpp: cpp,
+  go: go,
+  rs: rust,
+  php: php,
+  html: xml,
+  htm: xml,
+  xml: xml,
+  svg: xml,
+  json: json,
+  yml: yaml,
+  yaml: yaml,
+  md: markdown,
+  markdown: markdown,
+  css: css,
+  scss: css,
+  sass: css,
+  less: css,
+  sql: sql,
 };
 
-function getLanguage(filePath) {
+function getLanguageExtension(filePath) {
   const ext = filePath.split('.').pop()?.toLowerCase();
-  return LANG_MAP[ext] || null;
+  return LANG_MAP[ext] ? [LANG_MAP[ext]()] : [];
 }
 
 function formatFileSize(bytes) {
@@ -96,132 +64,160 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// 静态主题 Extension，避免每次渲染重建
+const darkTheme = EditorView.theme({
+  '&': {
+    backgroundColor: '#0d0d0d',
+    color: '#e0e0e0',
+    height: '100%',
+    overflow: 'visible',
+  },
+  // 隐藏 CodeMirror 内置行号栏（由外部行号栏替代），但保留 minimap
+  '.cm-gutters:not(.cm-minimap-gutter)': {
+    display: 'none',
+  },
+  // scroller 绝对定位以支持横向滚动
+  '& .cm-scroller': {
+    position: 'absolute',
+    inset: '0',
+    fontFamily: "'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace",
+    fontSize: '13px',
+    lineHeight: '1.5',
+  },
+  // minimap 样式（位置由插件自行管理）
+  '.cm-minimap-gutter': {
+    background: '#0f0f0f',
+    borderLeft: '1px solid #262626',
+  },
+  '.cm-minimap-overlay': {
+    border: '1px solid rgba(128, 144, 178, 0.6)',
+    background: 'rgba(95, 110, 145, 0.15)',
+    borderRadius: '2px',
+    transition: 'opacity 0.2s ease',
+  },
+  '.cm-minimap-gutter:hover .cm-minimap-overlay': {
+    border: '1px solid rgba(128, 144, 178, 0.85)',
+    background: 'rgba(95, 110, 145, 0.25)',
+  },
+  '.cm-activeLine': {
+    backgroundColor: '#1a1a1a',
+  },
+  '.cm-cursor': {
+    borderLeftColor: '#e0e0e0',
+  },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
+    backgroundColor: '#264f78',
+  },
+}, { dark: true });
+
+// 语法高亮配色（GitHub Dark 风格）
+const darkHighlightStyle = HighlightStyle.define([
+  { tag: t.keyword, color: '#ff7b72' },
+  { tag: [t.name, t.deleted, t.character, t.propertyName, t.macroName], color: '#ffa657' },
+  { tag: [t.function(t.variableName), t.labelName], color: '#d2a8ff' },
+  { tag: [t.color, t.constant(t.name), t.standard(t.name)], color: '#79c0ff' },
+  { tag: [t.definition(t.name), t.separator], color: '#e0e0e0' },
+  { tag: [t.typeName, t.className, t.number, t.changed, t.annotation, t.modifier, t.self, t.namespace], color: '#ffa657' },
+  { tag: [t.operator, t.operatorKeyword, t.url, t.escape, t.regexp, t.link, t.special(t.string)], color: '#79c0ff' },
+  { tag: [t.meta, t.comment], color: '#8b949e', fontStyle: 'italic' },
+  { tag: t.strong, fontWeight: 'bold' },
+  { tag: t.emphasis, fontStyle: 'italic' },
+  { tag: t.strikethrough, textDecoration: 'line-through' },
+  { tag: t.link, color: '#79c0ff', textDecoration: 'underline' },
+  { tag: t.heading, fontWeight: 'bold', color: '#ffa657' },
+  { tag: [t.atom, t.bool, t.special(t.variableName)], color: '#79c0ff' },
+  { tag: [t.processingInstruction, t.string, t.inserted], color: '#a5d6ff' },
+  { tag: t.invalid, color: '#f85149' },
+]);
+
+const syntaxTheme = syntaxHighlighting(darkHighlightStyle);
+
 export default function FileContentView({ filePath, onClose }) {
-  const MINIMAP_VIEWPORT_HEIGHT = 56;
   const [content, setContent] = useState(null);
+  const [currentContent, setCurrentContent] = useState(null);
   const [error, setError] = useState(null);
   const [fileSize, setFileSize] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [saveStatus, setSaveStatus] = useState(null);
+  const [lineCount, setLineCount] = useState(0);
   const mounted = useRef(true);
-  const codeRef = useRef(null);
+  const saveTimeoutRef = useRef(null);
+  const saveRef = useRef(null);
   const lineNumRef = useRef(null);
-  const codeScrollRef = useRef(null);
-  const lineNumScrollRef = useRef(null);
-  const minimapRef = useRef(null);
-  const minimapCanvasRef = useRef(null);
-  const minimapViewportRef = useRef(null);
-  const lineCountRef = useRef(0);
-  const minimapDataRef = useRef([]);
-  const dragStateRef = useRef({ active: false, offsetY: 0 });
+  const editorViewRef = useRef(null);
+  const editorWrapperRef = useRef(null);
 
-  const computeMinimapData = (text) => {
-    const lines = text.split('\n');
-    lineCountRef.current = lines.length;
-    minimapDataRef.current = lines.map((line) => {
-      const len = line.trim().length;
-      return Math.min(1, len / 96);
-    });
-  };
+  const isDirty = content !== null && currentContent !== null && content !== currentContent;
 
-  const drawMinimap = () => {
-    const canvas = minimapCanvasRef.current;
-    const wrap = minimapRef.current;
-    const codeEl = codeScrollRef.current;
-    if (!canvas || !wrap || !codeEl) return;
-    const dpr = window.devicePixelRatio || 1;
-    const width = wrap.clientWidth;
-    const height = wrap.clientHeight;
-    if (width <= 0 || height <= 0) return;
-
-    if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
-      canvas.width = Math.floor(width * dpr);
-      canvas.height = Math.floor(height * dpr);
+  const doSave = useCallback(async () => {
+    if (!isDirty) return;
+    setSaveStatus('saving');
+    try {
+      const res = await fetch('/api/file-content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: filePath, content: currentContent }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      if (mounted.current) {
+        setContent(currentContent);
+        setFileSize(data.size);
+        setSaveStatus('saved');
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = setTimeout(() => {
+          if (mounted.current) setSaveStatus(null);
+        }, 2000);
+      }
+    } catch (err) {
+      if (mounted.current) {
+        setSaveStatus('failed');
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = setTimeout(() => {
+          if (mounted.current) setSaveStatus(null);
+        }, 3000);
+      }
     }
+  }, [isDirty, filePath, currentContent]);
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = '#0f0f0f';
-    ctx.fillRect(0, 0, width, height);
+  saveRef.current = doSave;
 
-    const data = minimapDataRef.current;
-    const count = lineCountRef.current;
-    if (!count || !data.length) return;
+  // 纵向滚动同步：CodeMirror 滚动时同步行号栏
+  const scrollSyncExtension = useMemo(() =>
+    EditorView.updateListener.of((update) => {
+      if (update.geometryChanged || update.viewportChanged) {
+        const scroller = update.view.scrollDOM;
+        if (lineNumRef.current) {
+          lineNumRef.current.scrollTop = scroller.scrollTop;
+        }
+      }
+    }),
+  []);
 
-    // 检测内容是否需要滚动
-    const { scrollHeight, clientHeight } = codeEl;
-    const needsScroll = scrollHeight > clientHeight;
+  // 手动绑定 scroll 事件以获得实时同步
+  const onEditorCreate = useCallback((view) => {
+    editorViewRef.current = view;
+    const scroller = view.scrollDOM;
+    const syncScroll = () => {
+      if (lineNumRef.current) {
+        lineNumRef.current.scrollTop = scroller.scrollTop;
+      }
+    };
+    scroller.addEventListener('scroll', syncScroll);
+    // 初始同步
+    syncScroll();
+  }, []);
 
-    // 如果内容不需要滚动，使用 viewport 高度作为绘制范围
-    // 如果需要滚动，使用整个 minimap 容器高度作为绘制范围
-    const drawHeight = needsScroll ? height : Math.min(height, MINIMAP_VIEWPORT_HEIGHT);
-
-    const innerPad = 4;
-    const avail = Math.max(4, width - innerPad * 2);
-    for (let i = 0; i < count; i += 1) {
-      const y = Math.floor((i / count) * drawHeight);
-      const intensity = data[i];
-      if (intensity < 0.06) continue;
-      const barWidth = Math.max(2, Math.floor(avail * intensity));
-      ctx.fillStyle = `rgba(146, 151, 179, ${0.2 + intensity * 0.45})`;
-      ctx.fillRect(innerPad, y, barWidth, 1);
-    }
-  };
-
-  const syncMinimapViewport = () => {
-    const codeEl = codeScrollRef.current;
-    const mapEl = minimapRef.current;
-    const viewportEl = minimapViewportRef.current;
-    if (!codeEl || !mapEl || !viewportEl) return;
-
-    const { scrollTop, scrollHeight, clientHeight } = codeEl;
-    const mapHeight = mapEl.clientHeight;
-    if (scrollHeight <= 0 || mapHeight <= 0) return;
-
-    const viewportHeight = Math.min(mapHeight, MINIMAP_VIEWPORT_HEIGHT);
-    const maxTop = Math.max(0, mapHeight - viewportHeight);
-    const scrollRange = Math.max(1, scrollHeight - clientHeight);
-    const top = (scrollTop / scrollRange) * maxTop;
-    viewportEl.style.height = `${viewportHeight}px`;
-    viewportEl.style.transform = `translateY(${top}px)`;
-  };
-
-  const scrollByMinimap = (clientY, keepGrabOffset = false) => {
-    const mapEl = minimapRef.current;
-    const codeEl = codeScrollRef.current;
-    const viewportEl = minimapViewportRef.current;
-    if (!mapEl || !codeEl || !viewportEl) return;
-    const rect = mapEl.getBoundingClientRect();
-    const viewportHeight = viewportEl.offsetHeight || MINIMAP_VIEWPORT_HEIGHT;
-    const maxViewportTop = Math.max(1, rect.height - viewportHeight);
-    const rawTop = keepGrabOffset
-      ? (clientY - rect.top - dragStateRef.current.offsetY)
-      : (clientY - rect.top - viewportHeight / 2);
-    const viewportTop = Math.max(0, Math.min(maxViewportTop, rawTop));
-    const ratio = viewportTop / maxViewportTop;
-    const maxScroll = Math.max(0, codeEl.scrollHeight - codeEl.clientHeight);
-    codeEl.scrollTop = ratio * maxScroll;
-  };
-
-  const onMinimapMouseDown = (e) => {
-    const viewportEl = minimapViewportRef.current;
-    if (!viewportEl) return;
-    const onViewport = viewportEl.contains(e.target);
-    dragStateRef.current.active = true;
-    dragStateRef.current.offsetY = onViewport
-      ? (e.clientY - viewportEl.getBoundingClientRect().top)
-      : (viewportEl.offsetHeight || MINIMAP_VIEWPORT_HEIGHT) / 2;
-    scrollByMinimap(e.clientY, true);
-    e.preventDefault();
-  };
-
-  // 加载文件内容
   const loadFileContent = useCallback(() => {
     mounted.current = true;
     setContent(null);
+    setCurrentContent(null);
     setError(null);
     setLoading(true);
+    setLineCount(0);
 
     fetch(`/api/file-content?path=${encodeURIComponent(filePath)}`)
       .then((r) => {
@@ -240,14 +236,15 @@ export default function FileContentView({ filePath, onClose }) {
       .then((data) => {
         if (mounted.current) {
           setContent(data.content);
+          setCurrentContent(data.content);
           setFileSize(data.size);
-          computeMinimapData(data.content);
+          setLineCount(data.content.split('\n').length);
           setLoading(false);
         }
       })
       .catch((err) => {
         if (mounted.current) {
-          setError(`${t('ui.fileLoadError')}: ${err.message}`);
+          setError(`${i18n('ui.fileLoadError')}: ${err.message}`);
           setLoading(false);
         }
       });
@@ -255,124 +252,124 @@ export default function FileContentView({ filePath, onClose }) {
 
   useEffect(() => {
     loadFileContent();
-
     return () => {
       mounted.current = false;
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
   }, [loadFileContent]);
 
-  useEffect(() => {
-    if (content && codeRef.current) {
-      const lang = getLanguage(filePath);
-      const lines = content.split('\n');
+  const extensions = useMemo(() => {
+    const exts = [
+      ...getLanguageExtension(filePath),
+      syntaxTheme,
+      scrollSyncExtension,
+      keymap.of([{
+        key: 'Mod-s',
+        run: () => { saveRef.current?.(); return true; },
+      }]),
+    ];
 
-      if (lang) {
-        try {
-          const highlighted = hljs.highlight(content, { language: lang });
-          const highlightedLines = highlighted.value.split('\n');
-          lineNumRef.current.innerHTML = highlightedLines
-            .map((_, i) => `<div class="${styles.lineNumberRow}">${i + 1}</div>`)
-            .join('');
-          codeRef.current.innerHTML = highlightedLines
-            .map((line) => `<div class="${styles.lineContentRow}">${line || ' '}</div>`)
-            .join('');
-        } catch {
-          lineNumRef.current.innerHTML = lines
-            .map((_, i) => `<div class="${styles.lineNumberRow}">${i + 1}</div>`)
-            .join('');
-          codeRef.current.innerHTML = lines
-            .map((line) => `<div class="${styles.lineContentRow}">${line || ' '}</div>`)
-            .join('');
-        }
-      } else {
-        lineNumRef.current.innerHTML = lines
-          .map((_, i) => `<div class="${styles.lineNumberRow}">${i + 1}</div>`)
-          .join('');
-        codeRef.current.innerHTML = lines
-          .map((line) => `<div class="${styles.lineContentRow}">${line || ' '}</div>`)
-          .join('');
-      }
-    }
-  }, [content, filePath]);
+    // 添加 minimap（优化配置）
+    exts.push(
+      showMinimap.compute(['doc'], (state) => {
+        return {
+          create: (view) => {
+            const dom = document.createElement('div');
+            return { dom };
+          },
+          displayText: 'characters', // 使用字符显示而非色块，更清晰
+          showOverlay: 'mouse-over',  // 仅在鼠标悬停时显示 overlay，减少视觉干扰
+        };
+      })
+    );
 
-  // 纵向滚动同步：代码区滚动时同步行号列
-  useEffect(() => {
-    const codeEl = codeScrollRef.current;
-    const lineEl = lineNumScrollRef.current;
-    if (!codeEl || !lineEl) return;
-    const onScroll = () => {
-      lineEl.scrollTop = codeEl.scrollTop;
-      syncMinimapViewport();
-    };
-    codeEl.addEventListener('scroll', onScroll);
-    onScroll();
-    return () => codeEl.removeEventListener('scroll', onScroll);
-  });
+    return exts;
+  }, [filePath, scrollSyncExtension]);
 
-  useEffect(() => {
-    if (!content) return;
-    const onResize = () => {
-      drawMinimap();
-      syncMinimapViewport();
-    };
-    drawMinimap();
-    syncMinimapViewport();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, [content]);
-
-  useEffect(() => {
-    const onMouseMove = (e) => {
-      if (!dragStateRef.current.active) return;
-      scrollByMinimap(e.clientY, true);
-    };
-    const onMouseUp = () => {
-      dragStateRef.current.active = false;
-    };
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
+  // 跟踪文档行数变化
+  const handleChange = useCallback((value) => {
+    setCurrentContent(value);
+    setLineCount(value.split('\n').length);
   }, []);
+
+  const saveStatusText = saveStatus === 'saving'
+    ? i18n('ui.saving')
+    : saveStatus === 'saved'
+      ? i18n('ui.saved')
+      : saveStatus === 'failed'
+        ? i18n('ui.saveFailed')
+        : null;
+
+  // 生成行号
+  const lineNumbers = useMemo(() => {
+    if (lineCount <= 0) return null;
+    const lines = [];
+    for (let i = 1; i <= lineCount; i++) {
+      lines.push(<div key={i} className={styles.lineNumRow}>{i}</div>);
+    }
+    return lines;
+  }, [lineCount]);
 
   return (
     <div className={styles.fileContentView}>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
-          <button className={styles.backBtn} onClick={onClose} title={t('ui.backToChat')}>
+          <button className={styles.backBtn} onClick={onClose} title={i18n('ui.backToChat')}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 18 9 12 15 6"/>
             </svg>
           </button>
           <span className={styles.filePath}>{filePath}</span>
         </div>
-        {fileSize > 0 && (
-          <span className={styles.fileSize}>{formatFileSize(fileSize)}</span>
-        )}
+        <div className={styles.headerRight}>
+          {saveStatusText && (
+            <span className={`${styles.saveStatus} ${saveStatus === 'failed' ? styles.saveStatusFailed : saveStatus === 'saved' ? styles.saveStatusSaved : ''}`}>
+              {saveStatusText}
+            </span>
+          )}
+          <button
+            className={styles.saveBtn}
+            onClick={doSave}
+            disabled={!isDirty || saveStatus === 'saving'}
+            title={`${i18n('ui.save')} (Ctrl+S)`}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            {i18n('ui.save')}
+          </button>
+          {fileSize > 0 && (
+            <span className={styles.fileSize}>{formatFileSize(fileSize)}</span>
+          )}
+        </div>
       </div>
       <div className={styles.contentContainer}>
         {error && <div className={styles.error}>{error}</div>}
-        {loading && !error && <div className={styles.loading}>{t('ui.loading')}</div>}
-        {!loading && content && (
-          <div className={styles.codeBlock}>
-            <div className={styles.lineNumberCol} ref={lineNumScrollRef}>
-              <div ref={lineNumRef}></div>
+        {loading && !error && <div className={styles.loading}>{i18n('ui.loading')}</div>}
+        {!loading && content !== null && (
+          <div className={styles.editorWrapper} ref={editorWrapperRef}>
+            <div className={styles.lineNumCol} ref={lineNumRef}>
+              {lineNumbers}
             </div>
-            <div className={styles.codePane}>
-              <div className={styles.codeCol} ref={codeScrollRef}>
-                <pre className={styles.codeContent}><code ref={codeRef}></code></pre>
-              </div>
-              <div
-                className={styles.minimap}
-                ref={minimapRef}
-                onMouseDown={onMinimapMouseDown}
-                title={t('ui.fileContent')}
-              >
-                <canvas className={styles.minimapCanvas} ref={minimapCanvasRef} />
-                <div className={styles.minimapViewport} ref={minimapViewportRef}></div>
-              </div>
+            <div className={styles.editorCol}>
+              <CodeMirror
+                value={content}
+                height="100%"
+                theme={darkTheme}
+                extensions={extensions}
+                onChange={handleChange}
+                onCreateEditor={onEditorCreate}
+                basicSetup={{
+                  lineNumbers: false,
+                  foldGutter: false,
+                  highlightActiveLine: true,
+                  highlightSelectionMatches: true,
+                  bracketMatching: true,
+                  autocompletion: false,
+                }}
+              />
             </div>
           </div>
         )}
