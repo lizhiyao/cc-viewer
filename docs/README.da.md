@@ -1,49 +1,71 @@
 # CC-Viewer
 
-Claude Code anmodningsovervågningssystem, der i realtid fanger og visualiserer alle API-anmodninger og -svar fra Claude Code (rå tekst, uden censur). Giver udviklere mulighed for at overvåge deres kontekst og gennemgå samt fejlfinde under Vibe Coding.
+Claude Code overvågningssystem til API-anmodninger. Fanger og visualiserer alle API-anmodninger og -svar fra Claude Code i realtid (rå tekst, uden beskæring). Gør det nemt for udviklere at overvåge deres kontekst og gennemgå eller fejlfinde under Vibe Coding.
+Den nyeste version af CC-Viewer tilbyder også serverbaseret webprogrammering samt værktøjer til mobilprogrammering. Du er velkommen til at bruge det i dine egne projekter — flere funktioner vil blive tilgængelige i fremtiden, herunder understøttelse af cloud-deployment.
 
-[English](../README.md) | [繁體中文](./README.zh-TW.md) | [简体中文](./README.zh.md) | [한국어](./README.ko.md) | [日本語](./README.ja.md) | [Deutsch](./README.de.md) | [Español](./README.es.md) | [Français](./README.fr.md) | [Italiano](./README.it.md) | Dansk | [Polski](./README.pl.md) | [Русский](./README.ru.md) | [العربية](./README.ar.md) | [Norsk](./README.no.md) | [Português (Brasil)](./README.pt-BR.md) | [ไทย](./README.th.md) | [Türkçe](./README.tr.md) | [Українська](./README.uk.md)
+[English](../README.md) | [简体中文](./README.zh.md) | [繁體中文](./README.zh-TW.md) | [한국어](./README.ko.md) | [日本語](./README.ja.md) | [Deutsch](./README.de.md) | [Español](./README.es.md) | [Français](./README.fr.md) | [Italiano](./README.it.md) | Dansk | [Polski](./README.pl.md) | [Русский](./README.ru.md) | [العربية](./README.ar.md) | [Norsk](./README.no.md) | [Português (Brasil)](./README.pt-BR.md) | [ไทย](./README.th.md) | [Türkçe](./README.tr.md) | [Українська](./README.uk.md)
 
-## Anvendelse
+## Sådan bruges det
 
 ### Installation
 
 ```bash
-npm install -g cc-viewer
+npm install -g cc-viewer --registry=https://registry.npmjs.org
 ```
 
-### Kørsel og automatisk konfiguration
+### Overvågningstilstand (i denne tilstand starter claude eller claude --dangerously-skip-permissions automatisk en logproces, der registrerer anmodninger)
 
 ```bash
 ccv
 ```
 
-Denne kommando registrerer automatisk den lokale Claude Code-installationsmetode (NPM eller Native Install) og tilpasser sig derefter.
+### Programmeringstilstand
 
-- **NPM-installation**: Injicerer automatisk et interceptorscript i Claude Codes `cli.js`.
-- **Native Install**: Registrerer automatisk `claude`-binærfilen, konfigurerer en lokal transparent proxy og opsætter en Zsh Shell Hook til automatisk trafikvideresendelses.
+== claude
 
-### Konfigurationstilsidesættelse (Configuration Override)
+```bash
+ccv -c
+```
 
-Hvis du har brug for at bruge et brugerdefineret API-endpoint (f.eks. en virksomhedsproxy), skal du blot konfigurere det i `~/.claude/settings.json` eller angive miljøvariablen `ANTHROPIC_BASE_URL`. `ccv` genkender det automatisk og videresender anmodninger korrekt.
+== claude --dangerously-skip-permissions
+
+```bash
+ccv -d
+```
+
+Når programmeringstilstanden er startet, åbnes websiden automatisk.
+
+Du kan bruge Claude direkte på websiden og samtidig se de fulde anmodningsdata samt kodeændringer.
+
+Og endnu mere imponerende — du kan endda programmere fra din mobilenhed!
+
+Kommandoen registrerer automatisk, hvordan Claude Code er installeret lokalt (NPM eller Native Install) og tilpasser sig derefter.
+
+- **NPM-installation**: Injicerer automatisk et interceptor-script i Claude Codes `cli.js`.
+- **Native Install**: Registrerer automatisk den binære `claude`-fil, konfigurerer en lokal transparent proxy og opsætter en Zsh Shell Hook til automatisk at videresende trafik.
+- Det anbefales at bruge den NPM-installerede version af Claude Code med dette projekt.
+
+### Konfigurationsoverskrivning (Configuration Override)
+
+Hvis du har brug for et brugerdefineret API-endpoint (f.eks. en virksomhedsproxy), skal du blot konfigurere det i `~/.claude/settings.json` eller sætte miljøvariablen `ANTHROPIC_BASE_URL`. `ccv` registrerer det automatisk og videresender anmodninger korrekt.
 
 ### Lydløs tilstand (Silent Mode)
 
-Som standard kører `ccv` i lydløs tilstand, når det omslutter `claude`, hvilket sikrer at din terminaloutput forbliver ren og konsistent med den native oplevelse. Alle logfiler fanges i baggrunden og kan ses via `http://localhost:7008`.
+Som standard kører `ccv` i lydløs tilstand, når den wrapper `claude`, så dit terminaloutput forbliver rent og konsistent med den native oplevelse. Alle logfiler fanges i baggrunden og kan ses via `http://localhost:7008`.
 
-Når konfigurationen er fuldført, bruges `claude`-kommandoen som normalt. Besøg `http://localhost:7008` for at se overvågningsgrænsefladen.
+Når konfigurationen er færdig, kan du bare bruge `claude`-kommandoen som normalt. Besøg `http://localhost:7008` for at se overvågningsgrænsefladen.
 
 ### Fejlfinding (Troubleshooting)
 
-Hvis du oplever problemer med at starte, er der en ultimativ fejlfindingsløsning:
-Trin 1: Åbn Claude Code i en vilkårlig mappe;
+Hvis du oplever problemer med at starte, er her en ultimativ fejlfindingsmetode:
+Trin 1: Åbn Claude Code i en vilkårlig mappe.
 Trin 2: Giv Claude Code følgende instruktion:
 ```
-Jeg har installeret npm-pakken cc-viewer, men efter at have kørt ccv fungerer den stadig ikke korrekt. Undersøg cc-viewers cli.js og findcc.js, og tilpas til den lokale Claude Code-installationsmetode baseret på det specifikke miljø. Begræns ændringerne så vidt muligt til findcc.js.
+Jeg har installeret npm-pakken cc-viewer, men efter at have kørt ccv virker den stadig ikke korrekt. Undersøg cli.js og findcc.js i cc-viewer, og tilpas den lokale Claude Code-installation baseret på det specifikke miljø. Begræns ændringerne til findcc.js så vidt muligt.
 ```
 At lade Claude Code selv undersøge fejlen er mere effektivt end at spørge nogen eller læse dokumentation!
 
-Når ovenstående instruktion er udført, opdateres findcc.js. Hvis dit projekt ofte kræver lokal installation, eller hvis forket kode ofte skal løse installationsproblemer, kan du beholde denne fil og kopiere den direkte næste gang. På nuværende tidspunkt bruger mange projekter og virksomheder Claude Code ikke på Mac, men via serverhosting, så forfatteren har udskilt findcc.js for at gøre det nemmere at følge cc-viewer-kildekodeopdateringer fremover.
+Når ovenstående instruktion er udført, opdateres findcc.js. Hvis dit projekt ofte kræver lokal deployment, eller hvis du har forket koden og ofte skal løse installationsproblemer, kan du beholde denne fil og kopiere den direkte næste gang. I dag deployer mange projekter og virksomheder Claude Code på servere i stedet for Mac, så forfatteren har adskilt findcc.js for at gøre det nemmere at følge kildekodeopdateringer af cc-viewer.
 
 ### Afinstallation
 
@@ -54,40 +76,59 @@ ccv --uninstall
 ### Tjek version
 
 ```bash
-ccv --version
+ccv -v
 ```
 
 ## Funktioner
 
-### Anmodningsovervågning (rå teksttilstand)
+### Anmodningsovervågning (råteksttilstand)
 <img width="1500" height="720" alt="image" src="https://github.com/user-attachments/assets/519dd496-68bd-4e76-84d7-2a3d14ae3f61" />
-- Fanger i realtid alle API-anmodninger sendt af Claude Code og sikrer, at det er den rå tekst og ikke censurerede logfiler (dette er vigtigt!!!)
-- Genkender og markerer automatisk Main Agent- og Sub Agent-anmodninger (undertyper: Bash, Task, Plan, General)
-- MainAgent-anmodninger understøtter Body Diff JSON, der viser forskelle fra den forrige MainAgent-anmodning i sammenfoldet visning (viser kun ændrede/nye felter)
-- Inline token-forbrugsstatistik for hver anmodning (input/output tokens, cache-oprettelse/-læsning, hit-rate)
-- Kompatibel med Claude Code Router (CCR) og andre proxyscenarier — matcher anmodninger via API-stimønster som fallback
+
+- Fanger alle API-anmodninger fra Claude Code i realtid og sikrer, at det er den rå tekst — ikke en beskåret log (dette er vigtigt!!!)
+- Identificerer og markerer automatisk Main Agent- og Sub Agent-anmodninger (undertyper: Plan, Search, Bash)
+- MainAgent-anmodninger understøtter Body Diff JSON, der viser forskelle fra den forrige MainAgent-anmodning i en foldet visning (kun ændrede/nye felter)
+- Hver anmodning viser inline Token-forbrugsstatistik (input/output tokens, cache-oprettelse/læsning, hitrate)
+- Kompatibel med Claude Code Router (CCR) og andre proxy-scenarier — matcher anmodninger via API-stimønstre som fallback
 
 ### Samtaletilstand
 
-Klik på knappen "Samtaletilstand" øverst til højre for at parse Main Agents komplette samtalehistorik som en chatgrænseflade:
+Klik på knappen "Samtaletilstand" i øverste højre hjørne for at parse Main Agents fulde samtalehistorik som en chatgrænseflade:
 <img width="1500" height="730" alt="image" src="https://github.com/user-attachments/assets/c973f142-748b-403f-b2b7-31a5d81e33e6" />
 
+- Understøtter endnu ikke visning af Agent Team
+- Brugermeddelelser er højrejusteret (blå bobler), Main Agent-svar er venstrejusteret (mørke bobler)
+- `thinking`-blokke er foldet som standard, renderet i Markdown — klik for at udvide og se tankeprocessen; understøtter oversættelse med ét klik (funktionen er stadig ustabil)
+- Brugervalgsmeddelelser (AskUserQuestion) vises i spørgsmål-svar-format
+- Tovejs synkronisering: Skift til samtaletilstand placerer dig automatisk ved den valgte anmodnings samtale; skift tilbage til råteksttilstand placerer dig automatisk ved den valgte anmodning
+- Indstillingspanel: Skift standardfoldningstilstand for værktøjsresultater og tænkeblokke
+- Mobil samtalevisning: I CLI-tilstand på mobil kan du trykke på knappen "Samtalevisning" i topbjælken for at åbne en skrivebeskyttet samtalevisning og gennemse den fulde samtalehistorik på din telefon
 
-- Visning af Agent Team understøttes endnu ikke
-- Brugermeddelelser er højrejusterede (blå bobler), Main Agent-svar er venstrejusterede (mørke bobler)
-- `thinking`-blokke er som standard sammenfoldet, renderet i Markdown, klik for at udvide og se tankeprocessen; understøtter oversættelse med ét klik (funktionen er endnu ikke stabil)
-- Brugervalgsmeddelelser (AskUserQuestion) vises i spørgsmål-og-svar-format
-- Tovejs tilstandssynkronisering: skifter automatisk til den valgte anmodnings tilsvarende samtale ved skift til samtaletilstand; vender automatisk tilbage til den valgte anmodning ved skift tilbage til rå teksttilstand
-- Indstillingspanel: kan skifte standardsammenfoldet tilstand for værktøjsresultater og thinking-blokke
-- Mobil chat-gennemse: I mobil CLI-tilstand kan du trykke på knappen "Gennemse chat" i topbjælken for at skubbe en skrivebeskyttet chatvisning ind og gennemse den fulde samtalehistorik på din telefon
+### Programmeringstilstand
 
+Når du starter med ccv -c eller ccv -d, kan du se:
+<img width="1500" height="725" alt="image" src="https://github.com/user-attachments/assets/a64a381e-5a68-430c-b594-6d57dc01f4d3" />
+
+Du kan se kode-diff direkte efter redigering:
+<img width="1500" height="728" alt="image" src="https://github.com/user-attachments/assets/2a4acdaa-fc5f-4dc0-9e5f-f3273f0849b2" />
+
+Selvom du kan åbne filer og kode manuelt, anbefales det ikke — det er gammeldags programmering!
+
+### Mobilprogrammering
+
+Du kan endda scanne en QR-kode og programmere fra din mobilenhed:
+<img width="3018" height="1460" alt="image" src="https://github.com/user-attachments/assets/8debf48e-daec-420c-b37a-609f8b81cd20" />
+
+På mobilen kan du se:
+<img width="1700" height="790" alt="image" src="https://github.com/user-attachments/assets/da3e519f-ff66-4cd2-81d1-f4e131215f6c" />
+
+Opfylder dine forventninger til mobilprogrammering.
 
 ### Statistikværktøj
 
 Det svævende "Datastatistik"-panel i header-området:
 <img width="1500" height="729" alt="image" src="https://github.com/user-attachments/assets/b23f9a81-fc3d-4937-9700-e70d84e4e5ce" />
 
-- Viser antal cache-oprettelser/-læsninger og cache hit-rate
+- Viser antal cache-oprettelser/-læsninger og cache-hitrate
 - Cache-genopbygningsstatistik: viser antal og cache_creation tokens grupperet efter årsag (TTL, system/tools/model-ændringer, beskedafskæring/-ændring, nøgleændring)
 - Værktøjsanvendelsesstatistik: viser kaldsfrekvens for hvert værktøj sorteret efter antal kald
 - Skill-anvendelsesstatistik: viser kaldsfrekvens for hver Skill sorteret efter antal kald
@@ -102,7 +143,7 @@ Via CC-Viewer-rullemenuen øverst til venstre:
 - Indlæs lokal JSONL-fil: vælg og indlæs en lokal `.jsonl`-fil direkte (understøtter op til 500MB)
 - Gem nuværende log som: download den aktuelle overvågnings-JSONL-logfil
 - Flet logfiler: kombiner flere JSONL-logfiler til én session for samlet analyse
-- Se bruger-Prompts: udtræk og vis alle brugerinput med tre visningstilstande — Rå teksttilstand (råt indhold), Konteksttilstand (systemtags kan foldes), Teksttilstand (kun ren tekst); slash-kommandoer (`/model`, `/context` osv.) vises som selvstændige poster; kommandorelaterede tags skjules automatisk fra Prompt-indholdet
+- Se bruger-Prompts: udtræk og vis alle brugerinput med tre visningstilstande — Råteksttilstand (råt indhold), Konteksttilstand (systemtags kan foldes), Teksttilstand (kun ren tekst); slash-kommandoer (`/model`, `/context` osv.) vises som selvstændige poster; kommandorelaterede tags skjules automatisk fra Prompt-indholdet
 - Eksporter Prompt til TXT: eksporter brugerprompter (kun tekst, uden systemtags) til en lokal `.txt`-fil
 
 ### Flersproget understøttelse
@@ -113,9 +154,9 @@ CC-Viewer understøtter 18 sprog og skifter automatisk baseret på systemets spr
 
 ### Automatisk opdatering
 
-CC-Viewer tjekker automatisk for opdateringer ved opstart (højst én gang hver 4. time). Inden for samme hovedversion (f.eks. 1.x.x → 1.y.z) anvendes opdateringer automatisk og træder i kraft ved næste genstart. Ændringer af hovedversion viser kun en notifikation.
+CC-Viewer tjekker automatisk for opdateringer ved opstart (højst én gang hver 4. time). Inden for samme hovedversion (f.eks. 1.x.x → 1.y.z) opdateres automatisk, og ændringerne træder i kraft ved næste opstart. Ved skift af hovedversion vises kun en notifikation.
 
-Automatisk opdatering følger Claude Codes globale konfiguration i `~/.claude/settings.json`. Hvis Claude Code har deaktiveret automatiske opdateringer (`autoUpdates: false`), springer CC-Viewer også automatiske opdateringer over.
+Automatisk opdatering følger Claude Codes globale konfiguration `~/.claude/settings.json`. Hvis Claude Code har deaktiveret automatisk opdatering (`autoUpdates: false`), springer CC-Viewer også automatisk opdatering over.
 
 ## License
 

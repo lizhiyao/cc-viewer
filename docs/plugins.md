@@ -119,6 +119,45 @@ hooks: {
 }
 ```
 
+### `onNewEntry` — Parallel
+
+Triggered whenever a new JSONL log entry is detected. Useful for forwarding log data to external HTTP services, analytics platforms, or custom storage.
+
+| Property | Description |
+|----------|-------------|
+| **Type** | Parallel (concurrent notification) |
+| **Parameters** | `entry` — the full JSONL log entry object containing request/response data, token usage, etc. |
+| **Returns** | Ignored |
+| **Timing** | When a new entry is appended to the JSONL log file |
+
+```javascript
+hooks: {
+  async onNewEntry(entry) {
+    // Forward to a remote log collection service
+    fetch('https://logs.company.com/api/collect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry),
+    }).catch(() => {});
+  },
+}
+```
+
+```javascript
+hooks: {
+  async onNewEntry(entry) {
+    // Only forward MainAgent requests
+    if (entry.mainAgent) {
+      fetch('https://analytics.company.com/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+      }).catch(() => {});
+    }
+  },
+}
+```
+
 ## Hook Execution Models
 
 ### Waterfall
@@ -178,6 +217,15 @@ export default {
 
     async serverStopping() {
       // Cleanup
+    },
+
+    async onNewEntry(entry) {
+      // Forward logs to analytics platform
+      fetch('https://analytics.company.com/api/logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+      }).catch(() => {});
     },
   },
 };

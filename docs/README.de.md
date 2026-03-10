@@ -1,6 +1,7 @@
 # CC-Viewer
 
 Anfragenüberwachungssystem für Claude Code, das alle API-Anfragen und -Antworten in Echtzeit erfasst und visualisiert (Originaltext, ungekürzt). Ermöglicht Entwicklern die Überwachung ihres Contexts, um Probleme beim Vibe Coding nachzuvollziehen und zu beheben.
+Die neueste Version von CC-Viewer bietet außerdem eine Lösung für serverbasiertes Web-Programmieren sowie Tools für die mobile Programmierung. Wir laden alle ein, diese in ihren eigenen Projekten einzusetzen. In Zukunft werden weitere Plugin-Funktionen und Cloud-Deployment-Unterstützung folgen.
 
 [English](../README.md) | [简体中文](./README.zh.md) | [繁體中文](./README.zh-TW.md) | [한국어](./README.ko.md) | [日本語](./README.ja.md) | Deutsch | [Español](./README.es.md) | [Français](./README.fr.md) | [Italiano](./README.it.md) | [Dansk](./README.da.md) | [Polski](./README.pl.md) | [Русский](./README.ru.md) | [العربية](./README.ar.md) | [Norsk](./README.no.md) | [Português (Brasil)](./README.pt-BR.md) | [ไทย](./README.th.md) | [Türkçe](./README.tr.md) | [Українська](./README.uk.md)
 
@@ -9,19 +10,40 @@ Anfragenüberwachungssystem für Claude Code, das alle API-Anfragen und -Antwort
 ### Installation
 
 ```bash
-npm install -g cc-viewer
+npm install -g cc-viewer --registry=https://registry.npmjs.org
 ```
 
-### Ausführen und automatische Konfiguration
+### Überwachungsmodus (In diesem Modus wird beim Starten von claude oder claude --dangerously-skip-permissions automatisch ein Log-Prozess gestartet, der die Anfragen aufzeichnet)
 
 ```bash
 ccv
 ```
 
+### Programmiermodus
+
+== claude
+
+```bash
+ccv -c
+```
+
+== claude --dangerously-skip-permissions
+
+```bash
+ccv -d
+```
+
+Nach dem Start des Programmiermodus wird automatisch eine Webseite geöffnet.
+
+Sie können Claude direkt auf der Webseite verwenden und gleichzeitig die vollständigen Anfragenprotokolle einsehen sowie Codeänderungen überprüfen.
+
+Und noch besser — Sie können sogar auf dem Mobilgerät programmieren!
+
 Dieser Befehl erkennt automatisch die Installationsmethode von Claude Code (NPM oder Native Install) und passt sich entsprechend an.
 
 - **NPM-Installation**: Injiziert automatisch das Interceptor-Skript in `cli.js` von Claude Code.
 - **Native Install**: Erkennt automatisch die `claude`-Binärdatei, konfiguriert einen lokalen transparenten Proxy und richtet einen Zsh Shell Hook ein, um den Datenverkehr automatisch weiterzuleiten.
+- Dieses Projekt empfiehlt die Verwendung der über NPM installierten Version von Claude Code.
 
 ### Konfigurationsüberschreibung (Configuration Override)
 
@@ -54,15 +76,16 @@ ccv --uninstall
 ### Version prüfen
 
 ```bash
-ccv --version
+ccv -v
 ```
 
 ## Funktionen
 
 ### Anfragenüberwachung (Originaltextmodus)
 <img width="1500" height="720" alt="image" src="https://github.com/user-attachments/assets/519dd496-68bd-4e76-84d7-2a3d14ae3f61" />
+
 - Echtzeit-Erfassung aller API-Anfragen von Claude Code — im Originaltext, nicht in gekürzten Logs (das ist wichtig!!!)
-- Automatische Erkennung und Kennzeichnung von Main Agent- und Sub Agent-Anfragen (Untertypen: Bash, Task, Plan, General)
+- Automatische Erkennung und Kennzeichnung von Main Agent- und Sub Agent-Anfragen (Untertypen: Plan, Search, Bash)
 - MainAgent-Anfragen unterstützen Body Diff JSON, das eingeklappt die Unterschiede zur vorherigen MainAgent-Anfrage anzeigt (nur geänderte/neue Felder)
 - Inline-Token-Nutzungsstatistiken pro Anfrage (Eingabe-/Ausgabe-Token, Cache-Erstellung/-Lesen, Trefferquote)
 - Kompatibel mit Claude Code Router (CCR) und anderen Proxy-Szenarien — Anfragen werden als Fallback über API-Pfadmuster erkannt
@@ -72,14 +95,33 @@ ccv --version
 Klicken Sie auf die Schaltfläche „Konversationsmodus" oben rechts, um den vollständigen Gesprächsverlauf des Main Agent als Chat-Oberfläche darzustellen:
 <img width="1500" height="730" alt="image" src="https://github.com/user-attachments/assets/c973f142-748b-403f-b2b7-31a5d81e33e6" />
 
-
 - Darstellung von Agent Teams wird derzeit noch nicht unterstützt
 - Benutzernachrichten rechtsbündig (blaue Blasen), Main Agent-Antworten linksbündig (dunkle Blasen)
 - `thinking`-Blöcke sind standardmäßig eingeklappt, werden als Markdown gerendert und können zum Anzeigen des Denkprozesses aufgeklappt werden; Ein-Klick-Übersetzung wird unterstützt (Funktion noch instabil)
 - Benutzerauswahl-Nachrichten (AskUserQuestion) werden im Frage-Antwort-Format dargestellt
 - Bidirektionale Modussynchronisation: Beim Wechsel zum Konversationsmodus wird automatisch zur Konversation der ausgewählten Anfrage navigiert; beim Zurückwechseln zum Originaltextmodus wird automatisch zur ausgewählten Anfrage navigiert
 - Einstellungspanel: Standardmäßiger Einklappstatus von Tool-Ergebnissen und Thinking-Blöcken kann umgeschaltet werden
-- Mobile Chat-Durchsuchen: Im mobilen CLI-Modus tippen Sie auf die Schaltfläche „Chat durchsuchen" in der oberen Leiste, um eine schreibgeschützte Chat-Ansicht einzublenden und den gesamten Gesprächsverlauf auf Ihrem Telefon zu durchsuchen
+- Mobile Konversationsansicht: Im CLI-Modus auf dem Mobilgerät können Sie über die Schaltfläche „Konversationsansicht" in der oberen Leiste eine schreibgeschützte Konversationsansicht öffnen, um den vollständigen Gesprächsverlauf auf dem Handy zu durchsuchen
+
+### Programmiermodus
+
+Nach dem Start mit ccv -c oder ccv -d sehen Sie:
+<img width="1500" height="725" alt="image" src="https://github.com/user-attachments/assets/a64a381e-5a68-430c-b594-6d57dc01f4d3" />
+
+Nach der Bearbeitung können Sie die Code-Diffs direkt einsehen:
+<img width="1500" height="728" alt="image" src="https://github.com/user-attachments/assets/2a4acdaa-fc5f-4dc0-9e5f-f3273f0849b2" />
+
+Sie können zwar Dateien öffnen und manuell programmieren, aber das wird nicht empfohlen — das ist Programmieren auf die altmodische Art!
+
+### Mobile Programmierung
+
+Sie können sogar einen QR-Code scannen, um auf dem Mobilgerät zu programmieren:
+<img width="3018" height="1460" alt="image" src="https://github.com/user-attachments/assets/8debf48e-daec-420c-b37a-609f8b81cd20" />
+
+Auf dem Mobilgerät sehen Sie:
+<img width="1700" height="790" alt="image" src="https://github.com/user-attachments/assets/da3e519f-ff66-4cd2-81d1-f4e131215f6c" />
+
+Erfüllt Ihre Vorstellungen von mobiler Programmierung. Darüber hinaus gibt es einen Plugin-Mechanismus — wenn Sie Anpassungen an Ihre Programmiergewohnheiten vornehmen möchten, können Sie zukünftige Updates der Plugin-Hooks verfolgen.
 
 
 ### Statistik-Tools
@@ -111,11 +153,11 @@ CC-Viewer unterstützt 18 Sprachen und wechselt automatisch basierend auf der Sy
 
 简体中文 | English | 繁體中文 | 한국어 | Deutsch | Español | Français | Italiano | Dansk | 日本語 | Polski | Русский | العربية | Norsk | Português (Brasil) | ไทย | Türkçe | Українська
 
-### Automatische Aktualisierung
+### Automatische Updates
 
-CC-Viewer prüft beim Start automatisch auf Updates (maximal alle 4 Stunden). Innerhalb derselben Hauptversion (z.B. 1.x.x → 1.y.z) werden Updates automatisch angewendet und beim nächsten Neustart wirksam. Bei Hauptversionsänderungen wird nur eine Benachrichtigung angezeigt.
+CC-Viewer prüft beim Start automatisch auf Updates (maximal einmal alle 4 Stunden). Innerhalb derselben Hauptversion (z. B. 1.x.x → 1.y.z) wird automatisch aktualisiert und beim nächsten Start wirksam. Bei einem Hauptversionswechsel wird nur eine Benachrichtigung angezeigt.
 
-Die automatische Aktualisierung folgt der globalen Konfiguration von Claude Code in `~/.claude/settings.json`. Wenn Claude Code automatische Updates deaktiviert hat (`autoUpdates: false`), überspringt CC-Viewer ebenfalls automatische Updates.
+Die automatische Aktualisierung folgt der globalen Claude Code-Konfiguration `~/.claude/settings.json`. Wenn Claude Code die automatischen Updates deaktiviert hat (`autoUpdates: false`), überspringt CC-Viewer die automatische Aktualisierung ebenfalls.
 
 ## License
 

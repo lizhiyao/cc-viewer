@@ -71,6 +71,7 @@ export default {
 | `localUrl` | waterfall | `{ url, ip, port, token }` | `{ url }` | 客户端请求局域网地址时 |
 | `serverStarted` | parallel | `{ port, host }` | 忽略 | 服务器启动成功后 |
 | `serverStopping` | parallel | `{}` | 忽略 | 服务器关闭前 |
+| `onNewEntry` | parallel | `entry` (JSONL 日志条目对象) | 忽略 | 检测到新的 JSONL 日志条目时 |
 
 ---
 
@@ -156,6 +157,46 @@ hooks: {
 }
 ```
 
+### `onNewEntry` — 新日志条目通知
+
+**类型：Parallel（并行通知）**
+
+每当 cc-viewer 检测到新的 JSONL 日志条目时触发。适合用于将日志数据转发到外部 HTTP 服务、数据分析平台或自定义存储。
+
+**参数说明：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `entry` | `object` | 完整的 JSONL 日志条目对象，包含请求/响应信息、token 用量等 |
+
+```javascript
+hooks: {
+  async onNewEntry(entry) {
+    // 示例 1：转发到远程日志收集服务
+    fetch('https://logs.company.com/api/collect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry),
+    }).catch(() => {});
+  },
+}
+```
+
+```javascript
+hooks: {
+  async onNewEntry(entry) {
+    // 示例 2：仅转发 MainAgent 请求
+    if (entry.mainAgent) {
+      fetch('https://analytics.company.com/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+      }).catch(() => {});
+    }
+  },
+}
+```
+
 ---
 
 ## Hook 执行机制
@@ -237,6 +278,15 @@ export default {
 
     async serverStopping() {
       // 清理工作
+    },
+
+    async onNewEntry(entry) {
+      // 将日志转发到数据分析平台
+      fetch('https://analytics.company.com/api/logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+      }).catch(() => {});
     },
   },
 };

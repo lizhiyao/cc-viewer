@@ -208,6 +208,7 @@ function watchLogFile(logFile) {
           try {
             const parsed = JSON.parse(entry);
             sendToClients(parsed);
+            runParallelHook('onNewEntry', parsed).catch(() => {});
           } catch (err) {
             // Skip invalid entries
           }

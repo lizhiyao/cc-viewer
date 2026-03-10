@@ -1,6 +1,7 @@
 # CC-Viewer
 
-Claude Code forespørselsovervåkingssystem som fanger opp og visualiserer alle API-forespørsler og -svar fra Claude Code i sanntid (rå tekst, uten sensurering). Gjør det enkelt for utviklere å overvåke sin egen kontekst, slik at de kan se tilbake og feilsøke under Vibe Coding.
+Et overvåkingssystem for Claude Code-forespørsler som fanger opp og visuelt viser alle API-forespørsler og -svar fra Claude Code i sanntid (rå tekst, uten sensur). Praktisk for utviklere som vil overvåke sin egen kontekst, slik at man enkelt kan gå tilbake og feilsøke under Vibe Coding.
+Den nyeste versjonen av CC-Viewer tilbyr også løsninger for serverdistribusjon og webutvikling, samt verktøy for mobilutvikling. Velkommen til å ta det i bruk i egne prosjekter — støtte for skydistribusjon kommer i fremtiden.
 
 [English](../README.md) | [简体中文](./README.zh.md) | [繁體中文](./README.zh-TW.md) | [한국어](./README.ko.md) | [日本語](./README.ja.md) | [Deutsch](./README.de.md) | [Español](./README.es.md) | [Français](./README.fr.md) | [Italiano](./README.it.md) | [Dansk](./README.da.md) | [Polski](./README.pl.md) | [Русский](./README.ru.md) | [العربية](./README.ar.md) | Norsk | [Português (Brasil)](./README.pt-BR.md) | [ไทย](./README.th.md) | [Türkçe](./README.tr.md) | [Українська](./README.uk.md)
 
@@ -9,41 +10,62 @@ Claude Code forespørselsovervåkingssystem som fanger opp og visualiserer alle 
 ### Installasjon
 
 ```bash
-npm install -g cc-viewer
+npm install -g cc-viewer --registry=https://registry.npmjs.org
 ```
 
-### Kjøring og automatisk konfigurasjon
+### Overvåkingsmodus (i denne modusen starter claude eller claude --dangerously-skip-permissions automatisk en loggprosess som registrerer forespørsler)
 
 ```bash
 ccv
 ```
 
-Denne kommandoen oppdager automatisk den lokale Claude Code-installasjonsmetoden (NPM eller Native Install) og tilpasser seg deretter.
+### Programmeringsmodus
+
+== claude
+
+```bash
+ccv -c
+```
+
+== claude --dangerously-skip-permissions
+
+```bash
+ccv -d
+```
+
+Etter at programmeringsmodus er startet, åpnes nettsiden automatisk.
+
+Du kan bruke Claude direkte på nettsiden, samtidig som du kan se fullstendige forespørsler og kodeendringer.
+
+Og enda mer imponerende — du kan til og med programmere fra mobilenheten!
+
+Kommandoen oppdager automatisk hvordan Claude Code er installert lokalt (NPM eller Native Install) og tilpasser seg deretter.
 
 - **NPM-installasjon**: Injiserer automatisk et avlyttingsskript i Claude Codes `cli.js`.
 - **Native Install**: Oppdager automatisk `claude`-binærfilen, konfigurerer en lokal transparent proxy og setter opp en Zsh Shell Hook for automatisk videresending av trafikk.
+- Dette prosjektet anbefaler å bruke Claude Code installert via npm.
 
 ### Konfigurasjonsoverstyring (Configuration Override)
 
-Hvis du trenger å bruke et tilpasset API-endepunkt (f.eks. bedriftsproxy), konfigurer det i `~/.claude/settings.json` eller sett miljøvariabelen `ANTHROPIC_BASE_URL`. `ccv` vil automatisk gjenkjenne og videresende forespørsler korrekt.
+Hvis du trenger å bruke et tilpasset API-endepunkt (f.eks. en bedriftsproxy), kan du konfigurere det i `~/.claude/settings.json` eller sette miljøvariabelen `ANTHROPIC_BASE_URL`. `ccv` gjenkjenner dette automatisk og videresender forespørsler korrekt.
 
 ### Stillemodus (Silent Mode)
 
-Som standard kjører `ccv` i stillemodus når den omslutter `claude`, noe som sikrer at terminalutdataene dine forblir ryddige og konsistente med den opprinnelige opplevelsen. Alle logger fanges i bakgrunnen og kan vises via `http://localhost:7008`.
+Som standard kjører `ccv` i stillemodus når den omslutter `claude`, slik at terminalutskriften holdes ryddig og konsistent med den opprinnelige opplevelsen. Alle logger fanges opp i bakgrunnen og kan vises via `http://localhost:7008`.
 
-Etter at konfigurasjonen er fullført, bruk `claude`-kommandoen som vanlig. Besøk `http://localhost:7008` for å se overvåkingsgrensesnittet.
+Etter at konfigurasjonen er fullført, bruker du bare `claude`-kommandoen som vanlig. Gå til `http://localhost:7008` for å se overvåkingsgrensesnittet.
 
 ### Feilsøking (Troubleshooting)
 
-Hvis du opplever problemer med å starte, finnes det en definitiv feilsøkingsmetode:
-Steg 1: Åpne Claude Code i en hvilken som helst katalog;
+Hvis du opplever problemer med oppstart, finnes det en ultimat feilsøkingsmetode:
+Steg 1: Åpne Claude Code i en vilkårlig mappe.
 Steg 2: Gi Claude Code følgende instruksjon:
 ```
-Jeg har installert npm-pakken cc-viewer, men etter å ha kjørt ccv fungerer den fortsatt ikke riktig. Se på cc-viewer sin cli.js og findcc.js, og tilpass den til den lokale Claude Code-distribusjonsmetoden basert på det spesifikke miljøet. Prøv å begrense endringene til findcc.js.
+Jeg har installert npm-pakken cc-viewer, men etter å ha kjørt ccv fungerer den fortsatt ikke. Sjekk cli.js og findcc.js i cc-viewer, og tilpass til den lokale Claude Code-installasjonen basert på det spesifikke miljøet. Begrens endringene til findcc.js så langt det er mulig.
 ```
-La Claude Code selv sjekke feilen — det er mer effektivt enn å spørre noen eller lese dokumentasjon!
+Å la Claude Code selv undersøke feilen er mer effektivt enn å spørre noen eller lese dokumentasjon!
 
-Etter at instruksjonen er fullført, vil findcc.js bli oppdatert. Hvis prosjektet ditt ofte krever lokal distribusjon, eller hvis forgrenet kode ofte trenger å løse installasjonsproblemer, kan du beholde denne filen og kopiere den direkte neste gang. På dette stadiet bruker mange prosjekter og selskaper Claude Code ikke på Mac, men på server-side hosting, så forfatteren har skilt ut findcc.js for å gjøre det enklere å følge oppdateringer av cc-viewer-kildekoden.
+Etter at instruksjonen ovenfor er fullført, oppdateres findcc.js. Hvis prosjektet ditt ofte krever lokal distribusjon, eller du har forket koden og ofte må løse installasjonsproblemer, kan du beholde denne filen og kopiere den direkte neste gang. Mange prosjekter og bedrifter bruker i dag Claude Code med serverdistribusjon i stedet for Mac-distribusjon, så forfatteren har skilt ut findcc.js for å gjøre det enklere å følge kildekodeoppdateringer for cc-viewer.
 
 ### Avinstallasjon
 
@@ -54,17 +76,18 @@ ccv --uninstall
 ### Sjekk versjon
 
 ```bash
-ccv --version
+ccv -v
 ```
 
 ## Funksjoner
 
 ### Forespørselsovervåking (råtekstmodus)
 <img width="1500" height="720" alt="image" src="https://github.com/user-attachments/assets/519dd496-68bd-4e76-84d7-2a3d14ae3f61" />
-- Fanger alle API-forespørsler fra Claude Code i sanntid, og sikrer at det er rå tekst og ikke sensurerte logger (dette er viktig!!!)
-- Gjenkjenner og merker automatisk Main Agent- og Sub Agent-forespørsler (undertyper: Bash, Task, Plan, General)
-- MainAgent-forespørsler støtter Body Diff JSON, som viser forskjeller fra forrige MainAgent-forespørsel i sammenfoldet visning (viser kun endrede/nye felt)
-- Hver forespørsel viser inline Token-bruksstatistikk (inndata-/utdata-tokens, cache-opprettelse/-lesing, treffrate)
+
+- Fanger alle API-forespørsler fra Claude Code i sanntid, og sikrer at det er råtekst — ikke sensurerte logger (dette er viktig!!!)
+- Gjenkjenner og merker automatisk Main Agent- og Sub Agent-forespørsler (undertyper: Plan, Search, Bash)
+- MainAgent-forespørsler støtter Body Diff JSON, som viser forskjeller fra forrige MainAgent-forespørsel i sammenfoldet visning (kun endrede/nye felt)
+- Hver forespørsel viser inline tokenforbruksstatistikk (inn-/ut-tokens, cache-opprettelse/-lesing, treffrate)
 - Kompatibel med Claude Code Router (CCR) og andre proxy-scenarier — matcher forespørsler via API-stimønster som reserveløsning
 
 ### Samtalemodus
@@ -72,15 +95,33 @@ ccv --version
 Klikk på «Samtalemodus»-knappen øverst til høyre for å analysere Main Agents fullstendige samtalehistorikk som et chattegrensesnitt:
 <img width="1500" height="730" alt="image" src="https://github.com/user-attachments/assets/c973f142-748b-403f-b2b7-31a5d81e33e6" />
 
-
 - Støtter foreløpig ikke visning av Agent Team
 - Brukermeldinger er høyrejustert (blå bobler), Main Agent-svar er venstrejustert (mørke bobler)
-- `thinking`-blokker er sammenfoldet som standard, gjengitt i Markdown, klikk for å utvide og se tankeprosessen; støtter ett-klikks oversettelse (funksjonen er fortsatt ustabil)
+- `thinking`-blokker er sammenfoldet som standard, gjengitt i Markdown — klikk for å utvide og se tankeprosessen; støtter ett-klikks oversettelse (funksjonen er fortsatt ustabil)
 - Brukervalgmeldinger (AskUserQuestion) vises i spørsmål-og-svar-format
-- Toveis modussynkronisering: når du bytter til samtalemodus, navigeres det automatisk til samtalen som tilsvarer den valgte forespørselen; når du bytter tilbake til råtekstmodus, navigeres det automatisk til den valgte forespørselen
-- Innstillingspanel: du kan veksle standard sammenfoldet tilstand for verktøyresultater og tenkingsblokker
-- Mobil chat-gjennomgang: I mobil CLI-modus trykker du på knappen «Bla gjennom chat» i topplinjen for å skyve inn en skrivebeskyttet chatvisning og bla gjennom hele samtalehistorikken på telefonen
+- Toveis modussynkronisering: ved bytte til samtalemodus navigeres det automatisk til samtalen som tilsvarer den valgte forespørselen; ved bytte tilbake til råtekstmodus navigeres det automatisk til den valgte forespørselen
+- Innstillingspanel: du kan veksle standardtilstanden for sammenfolding av verktøyresultater og tenkingsblokker
+- Samtalevisning på mobil: i CLI-modus på mobil, trykk på «Samtalevisning»-knappen i topplinjen for å åpne en skrivebeskyttet samtalevisning der du kan bla gjennom fullstendig samtalehistorikk på mobilen
 
+### Programmeringsmodus
+
+Etter oppstart med ccv -c eller ccv -d ser du:
+<img width="1500" height="725" alt="image" src="https://github.com/user-attachments/assets/a64a381e-5a68-430c-b594-6d57dc01f4d3" />
+
+Du kan se kodediff direkte etter redigering:
+<img width="1500" height="728" alt="image" src="https://github.com/user-attachments/assets/2a4acdaa-fc5f-4dc0-9e5f-f3273f0849b2" />
+
+Du kan åpne filer og redigere manuelt, men det anbefales ikke — det er gammeldags programmering!
+
+### Mobilprogrammering
+
+Du kan til og med skanne en QR-kode for å programmere på mobilenheten:
+<img width="3018" height="1460" alt="image" src="https://github.com/user-attachments/assets/8debf48e-daec-420c-b37a-609f8b81cd20" />
+
+På mobilenheten kan du se:
+<img width="1700" height="790" alt="image" src="https://github.com/user-attachments/assets/da3e519f-ff66-4cd2-81d1-f4e131215f6c" />
+
+Oppfyller dine forventninger til mobilprogrammering.
 
 ### Statistikkverktøy
 

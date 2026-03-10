@@ -1,6 +1,7 @@
 # CC-Viewer
 
 A Claude Code request monitoring system that captures and visualizes all API requests and responses from Claude Code in real time (raw text, unredacted). Helps developers monitor their context for review and troubleshooting during Vibe Coding sessions.
+The latest version of CC-Viewer also provides a server-deployed web programming solution and mobile programming tools. Feel free to use them in your own projects — more plugin features and cloud deployment support are coming in the future.
 
 English | [简体中文](./docs/README.zh.md) | [繁體中文](./docs/README.zh-TW.md) | [한국어](./docs/README.ko.md) | [日本語](./docs/README.ja.md) | [Deutsch](./docs/README.de.md) | [Español](./docs/README.es.md) | [Français](./docs/README.fr.md) | [Italiano](./docs/README.it.md) | [Dansk](./docs/README.da.md) | [Polski](./docs/README.pl.md) | [Русский](./docs/README.ru.md) | [العربية](./docs/README.ar.md) | [Norsk](./docs/README.no.md) | [Português (Brasil)](./docs/README.pt-BR.md) | [ไทย](./docs/README.th.md) | [Türkçe](./docs/README.tr.md) | [Українська](./docs/README.uk.md)
 
@@ -9,19 +10,40 @@ English | [简体中文](./docs/README.zh.md) | [繁體中文](./docs/README.zh-
 ### Installation
 
 ```bash
-npm install -g cc-viewer
+npm install -g cc-viewer --registry=https://registry.npmjs.org
 ```
 
-### Running and Auto-Configuration
+### Monitor Mode (launching claude or claude --dangerously-skip-permissions in this mode automatically starts a logging process to record request payloads)
 
 ```bash
 ccv
 ```
 
+### Programming Mode
+
+== claude
+
+```bash
+ccv -c
+```
+
+== claude --dangerously-skip-permissions
+
+```bash
+ccv -d
+```
+
+After launching programming mode, a web page will open automatically.
+
+You can use Claude directly from the web page while viewing the full request payloads and code changes.
+
+Even better — you can even code from your mobile device!
+
 This command automatically detects how Claude Code is installed locally (NPM or Native Install) and adapts accordingly.
 
 - **NPM Install**: Automatically injects an interceptor script into Claude Code's `cli.js`.
 - **Native Install**: Automatically detects the `claude` binary, configures a local transparent proxy, and sets up a Zsh Shell Hook to forward traffic automatically.
+- NPM-installed Claude Code is the recommended approach for this project.
 
 ### Configuration Override
 
@@ -56,15 +78,16 @@ ccv --uninstall
 ### Check Version
 
 ```bash
-ccv --version
+ccv -v
 ```
 
 ## Features
 
 ### Request Monitoring (Raw Mode)
 <img width="1500" height="720" alt="image" src="https://github.com/user-attachments/assets/519dd496-68bd-4e76-84d7-2a3d14ae3f61" />
+
 - Captures all API requests made by Claude Code in real time, ensuring raw content rather than truncated logs (this is important!!!)
-- Automatically identifies and labels Main Agent and Sub Agent requests (subtypes: Bash, Task, Plan, General)
+- Automatically identifies and labels Main Agent and Sub Agent requests (subtypes: Plan, Search, Bash)
 - MainAgent requests support Body Diff JSON, showing a collapsed diff of changes from the previous MainAgent request (only changed/added fields)
 - Inline token usage stats per request (input/output tokens, cache creation/read, hit rate)
 - Compatible with Claude Code Router (CCR) and other proxy scenarios — falls back to API path pattern matching
@@ -74,15 +97,33 @@ ccv --version
 Click the "Conversation Mode" button in the top-right corner to parse the Main Agent's full conversation history into a chat interface:
 <img width="1500" height="730" alt="image" src="https://github.com/user-attachments/assets/c973f142-748b-403f-b2b7-31a5d81e33e6" />
 
-
 - Agent Team display is not yet supported
 - User messages are right-aligned (blue bubbles), Main Agent replies are left-aligned (dark bubbles)
 - `thinking` blocks are collapsed by default, rendered in Markdown, and can be expanded to view the reasoning process; one-click translation is supported (feature is still unstable)
 - User selection messages (AskUserQuestion) are displayed in a Q&A format
-- Bidirectional mode sync: switching to Conversation Mode automatically navigates to the conversation corresponding to the selected request; switching back to Raw Mode automatically navigates to the selected request
-- Settings panel: toggle the default collapsed state of tool results and thinking blocks
-- Mobile chat browse: in mobile CLI mode, tap the "Chat Browse" button in the top bar to slide in a read-only chat view overlay, allowing you to browse the full conversation history on your phone
+- Bidirectional mode sync: switching to Conversation Mode automatically scrolls to the conversation corresponding to the selected request; switching back to Raw Mode automatically scrolls to the selected request
+- Settings panel: toggle the default collapsed state for tool results and thinking blocks
+- Mobile conversation browsing: in mobile CLI mode, tap the "Conversation Browse" button in the top bar to slide out a read-only conversation view for browsing the full conversation history on your phone
 
+### Programming Mode
+
+After launching with ccv -c or ccv -d, you will see:
+<img width="1500" height="725" alt="image" src="https://github.com/user-attachments/assets/a64a381e-5a68-430c-b594-6d57dc01f4d3" />
+
+You can view code diffs directly after editing:
+<img width="1500" height="728" alt="image" src="https://github.com/user-attachments/assets/2a4acdaa-fc5f-4dc0-9e5f-f3273f0849b2" />
+
+While you can open files and edit code manually, manual coding is not recommended — that's old-school coding!
+
+### Mobile Programming
+
+You can even scan a QR code to code on your mobile device:
+<img width="3018" height="1460" alt="image" src="https://github.com/user-attachments/assets/8debf48e-daec-420c-b37a-609f8b81cd20" />
+
+On mobile you can see:
+<img width="1700" height="790" alt="image" src="https://github.com/user-attachments/assets/da3e519f-ff66-4cd2-81d1-f4e131215f6c" />
+
+Fulfills everything you can imagine about mobile programming.
 
 ### Statistics Tool
 
