@@ -57,9 +57,9 @@ ccv
 
 该命令会自动检测本地 Claude Code 的安装方式（NPM 或 Native Install）并进行适配。
 
-- **NPM 安装**：自动向 Claude Code 的 `cli.js` 中注入拦截脚本。
-- **Native Install**：自动检测 `claude` 二进制文件，配置本地透明代理，并设置 Zsh Shell Hook 自动转发流量。
-- 本项目更推荐使用npm方式安装的claude code。
+- **NPM 版本claude code**：自动向 Claude Code 的 `cli.js` 中注入拦截脚本。
+- **Native 版本 claude code**：自动检测 `claude` 二进制文件，配置本地透明代理，并设置 Zsh Shell Hook 自动转发流量。
+- 本项目更推荐使用 npm 方式安装的 claude code。
 
 卸载日志模式：
 ```bash
