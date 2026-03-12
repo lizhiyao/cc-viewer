@@ -122,14 +122,14 @@ Triggered after the HTTP server starts successfully.
 | Property | Description |
 |----------|-------------|
 | **Type** | Parallel (concurrent notification) |
-| **Parameters** | `{ port, host }` |
+| **Parameters** | `{ port, host, url, ip, token }` |
 | **Returns** | Ignored |
 | **Timing** | After server binds to a port |
 
 ```javascript
 hooks: {
-  async serverStarted({ port, host }) {
-    console.error(`[my-plugin] Server is running on ${host}:${port}`);
+  async serverStarted({ port, host, url, ip, token }) {
+    console.error(`[my-plugin] Server is running at ${url}`);
   },
 }
 ```

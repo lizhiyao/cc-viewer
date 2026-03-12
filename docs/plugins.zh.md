@@ -70,7 +70,7 @@ export default {
 |-----------|------|------|--------|---------|
 | `httpsOptions` | waterfall | `{}` | `{ pfx, passphrase }` 或 `{ cert, key }` | 服务器创建前 |
 | `localUrl` | waterfall | `{ url, ip, port, token }` | `{ url }` | 客户端请求局域网地址时 |
-| `serverStarted` | parallel | `{ port, host }` | 忽略 | 服务器启动成功后 |
+| `serverStarted` | parallel | `{ port, host, url, ip, token }` | 忽略 | 服务器启动成功后 |
 | `serverStopping` | parallel | `{}` | 忽略 | 服务器关闭前 |
 | `onNewEntry` | parallel | `entry` (JSONL 日志条目对象) | 忽略 | 检测到新的 JSONL 日志条目时 |
 
@@ -168,14 +168,14 @@ hooks: {
 
 ```javascript
 hooks: {
-  async serverStarted({ port, host }) {
-    console.error(`[my-plugin] 服务器运行在 ${host}:${port}`);
+  async serverStarted({ port, host, url, ip, token }) {
+    console.error(`[my-plugin] 服务器运行在 ${url}`);
 
     // 示例：通知企业监控系统
     fetch('https://monitor.company.com/api/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ service: 'cc-viewer', port, host }),
+      body: JSON.stringify({ service: 'cc-viewer', port, host, url }),
     }).catch(() => {});
   },
 }

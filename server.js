@@ -244,6 +244,16 @@ function startWatching() {
   watchLogFile(LOG_FILE);
 }
 
+function getLocalIp() {
+  const nets = networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) return net.address;
+    }
+  }
+  return '127.0.0.1';
+}
+
 async function handleRequest(req, res) {
   const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
   const url = parsedUrl.pathname;
@@ -1212,17 +1222,7 @@ async function handleRequest(req, res) {
 
   // 返回局域网访问地址
   if (url === '/api/local-url' && method === 'GET') {
-    const nets = networkInterfaces();
-    let localIp = '127.0.0.1';
-    for (const name of Object.keys(nets)) {
-      for (const net of nets[name]) {
-        if (net.family === 'IPv4' && !net.internal) {
-          localIp = net.address;
-          break;
-        }
-      }
-      if (localIp !== '127.0.0.1') break;
-    }
+    const localIp = getLocalIp();
     const defaultUrl = `${serverProtocol}://${localIp}:${actualPort}?token=${ACCESS_TOKEN}`;
     const hookResult = await runWaterfallHook('localUrl', { url: defaultUrl, ip: localIp, port: actualPort, token: ACCESS_TOKEN });
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1665,7 +1665,7 @@ export async function startViewer() {
   const useHttps = !!httpsOptions;
   const protocol = useHttps ? 'https' : 'http';
   serverProtocol = protocol;
-  console.error(`[CC Viewer] useHttps=${useHttps}, httpsOptions=${httpsOptions ? 'present' : 'null'}`);
+  if (useHttps) console.error('[CC Viewer] HTTPS mode enabled via plugin hook');
 
   return new Promise((resolve, reject) => {
     function tryListen(port) {
@@ -1713,7 +1713,7 @@ export async function startViewer() {
             setupTerminalWebSocket(currentServer);
           }
           // 通知插件服务器已启动
-          runParallelHook('serverStarted', { port, host: HOST })
+          runParallelHook('serverStarted', { port, host: HOST, url, ip: getLocalIp(), token: ACCESS_TOKEN })
             .catch(err => console.error('[CC Viewer] Plugin serverStarted hook error:', err.message));
           resolve(server);
         });
