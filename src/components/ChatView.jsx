@@ -200,6 +200,7 @@ class ChatView extends React.Component {
       fileExplorerOpen: true,
       currentFile: null,
       currentGitDiff: null,
+      scrollToLine: null,
       fileExplorerExpandedPaths: new Set(),
       gitChangesOpen: false,
       snapLines: [],
@@ -1324,7 +1325,7 @@ class ChatView extends React.Component {
           {this.state.fileExplorerOpen && (
             <FileExplorer
               onClose={() => this.setState({ fileExplorerOpen: false })}
-              onFileClick={(path) => this.setState({ currentFile: path, currentGitDiff: null })}
+              onFileClick={(path) => this.setState({ currentFile: path, currentGitDiff: null, scrollToLine: null })}
               expandedPaths={this.state.fileExplorerExpandedPaths}
               onToggleExpand={this.handleToggleExpandPath}
               currentFile={this.state.currentFile}
@@ -1337,31 +1338,43 @@ class ChatView extends React.Component {
             />
           )}
           <div className={styles.chatSection} style={{ flex: 1, minWidth: 0, display: 'flex' }}>
-            <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {this.state.currentGitDiff ? (
-              <GitDiffView
-                filePath={this.state.currentGitDiff}
-                onClose={() => this.setState({ currentGitDiff: null })}
-              />
-            ) : this.state.currentFile ? (
-              <FileContentView
-                key={this.state.fileVersion}
-                filePath={this.state.currentFile}
-                editorSession={!!this.state.editorSessionId}
-                onClose={() => {
-                  if (this.state.editorSessionId) {
-                    fetch('/api/editor-done', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ sessionId: this.state.editorSessionId }),
-                    }).catch(() => {});
-                  }
-                  this.setState({ currentFile: null, fileVersion: 0, editorSessionId: null, editorFilePath: null });
-                }}
-              />
-            ) : (
-              messageList
+            <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+            {this.state.currentGitDiff && (
+              <div style={{ position: 'absolute', inset: 0, zIndex: 1, display: 'flex', flexDirection: 'column' }}>
+                <GitDiffView
+                  filePath={this.state.currentGitDiff}
+                  onClose={() => this.setState({ currentGitDiff: null })}
+                  onOpenFile={(path, line) => this.setState({
+                    currentGitDiff: null,
+                    currentFile: path,
+                    scrollToLine: line || 1,
+                    fileExplorerOpen: true,
+                    gitChangesOpen: false,
+                  })}
+                />
+              </div>
             )}
+            {this.state.currentFile && (
+              <div style={{ position: 'absolute', inset: 0, zIndex: 1, display: 'flex', flexDirection: 'column' }}>
+                <FileContentView
+                  key={this.state.fileVersion}
+                  filePath={this.state.currentFile}
+                  scrollToLine={this.state.scrollToLine}
+                  editorSession={!!this.state.editorSessionId}
+                  onClose={() => {
+                    if (this.state.editorSessionId) {
+                      fetch('/api/editor-done', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sessionId: this.state.editorSessionId }),
+                      }).catch(() => {});
+                    }
+                    this.setState({ currentFile: null, fileVersion: 0, editorSessionId: null, editorFilePath: null });
+                  }}
+                />
+              </div>
+            )}
+            {messageList}
             {!terminalVisible && (
               <div className={styles.chatInputBar}>
                 <div className={styles.chatInputWrapper}>
@@ -1415,6 +1428,7 @@ class ChatView extends React.Component {
                     editorFilePath: filePath,
                     currentFile: filePath,
                     currentGitDiff: null,
+                    scrollToLine: null,
                     fileVersion: (this.state.fileVersion || 0) + 1,
                   });
                 }} />

@@ -108,6 +108,142 @@ const darkTheme = EditorView.theme({
   '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
     backgroundColor: '#264f78',
   },
+  // Search / Replace 面板 — antd5 dark 风格
+  '.cm-panels': {
+    backgroundColor: '#141414',
+    borderBottom: '1px solid #303030',
+  },
+  '.cm-panel.cm-search': {
+    padding: '8px 12px 10px',
+    fontSize: '13px',
+    color: '#e0e0e0',
+    backgroundColor: '#141414',
+  },
+  '.cm-panel.cm-search input[type=text], .cm-panel.cm-search input[main]': {
+    height: '26px',
+    padding: '2px 11px',
+    fontSize: '100%',
+    color: '#e0e0e0',
+    backgroundColor: '#1f1f1f',
+    border: '1px solid #424242',
+    borderRadius: '6px',
+    outline: 'none',
+    transition: 'border-color 0.2s',
+    verticalAlign: 'middle',
+    boxSizing: 'border-box',
+  },
+  '.cm-panel.cm-search input[type=text]:focus': {
+    borderColor: '#1668dc',
+    boxShadow: '0 0 0 2px rgba(22, 104, 220, 0.15)',
+  },
+  // 覆盖 CodeMirror 基础主题的 .cm-textfield
+  '.cm-textfield': {
+    height: '26px',
+    padding: '2px 11px',
+    fontSize: '100%',
+    color: '#e0e0e0 !important',
+    backgroundColor: '#1f1f1f !important',
+    border: '1px solid #424242 !important',
+    borderRadius: '6px',
+    outline: 'none',
+    verticalAlign: 'middle',
+    boxSizing: 'border-box',
+  },
+  '.cm-textfield:focus': {
+    borderColor: '#1668dc !important',
+    boxShadow: '0 0 0 2px rgba(22, 104, 220, 0.15)',
+  },
+  '.cm-panel.cm-search input[type=checkbox]': {
+    accentColor: '#1668dc',
+    width: '14px',
+    height: '14px',
+    verticalAlign: 'middle',
+    marginRight: '4px',
+    cursor: 'pointer',
+  },
+  '.cm-panel.cm-search button': {
+    height: '26px',
+    padding: '2px 12px',
+    fontSize: '100%',
+    color: 'rgba(255, 255, 255, 0.85)',
+    backgroundColor: 'transparent',
+    backgroundImage: 'none !important',
+    border: '1px solid #424242',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    transition: 'background 0.2s, border-color 0.2s, color 0.2s',
+    verticalAlign: 'middle',
+    lineHeight: '1',
+  },
+  '.cm-panel.cm-search button:hover': {
+    color: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundImage: 'none !important',
+    borderColor: '#525252',
+  },
+  '.cm-panel.cm-search button:active': {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundImage: 'none !important',
+  },
+  // 覆盖 CodeMirror 基础主题的 .cm-button 渐变
+  '.cm-button': {
+    height: '26px',
+    padding: '2px 12px',
+    fontSize: '100%',
+    color: 'rgba(255, 255, 255, 0.85) !important',
+    backgroundColor: 'transparent !important',
+    backgroundImage: 'none !important',
+    border: '1px solid #424242 !important',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    lineHeight: '1',
+  },
+  '.cm-button:hover': {
+    color: '#ffffff !important',
+    backgroundColor: 'rgba(255, 255, 255, 0.08) !important',
+    backgroundImage: 'none !important',
+    borderColor: '#525252 !important',
+  },
+  '.cm-panel.cm-search button[name=close]': {
+    position: 'absolute',
+    top: '8px',
+    right: '8px',
+    width: '28px',
+    height: '28px',
+    padding: '0',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '16px',
+    color: '#666',
+    backgroundColor: 'transparent',
+    border: 'none',
+    borderRadius: '6px',
+  },
+  '.cm-panel.cm-search button[name=close]:hover': {
+    color: '#e0e0e0',
+    backgroundColor: '#2a2a2a',
+  },
+  '.cm-panel.cm-search label': {
+    fontSize: '13px',
+    color: '#a0a0a0',
+    verticalAlign: 'middle',
+    cursor: 'pointer',
+  },
+  '.cm-panel.cm-search label:hover': {
+    color: '#e0e0e0',
+  },
+  '.cm-panel.cm-search [name=close]': {
+    fontSize: '16px',
+  },
+  // 搜索高亮匹配色
+  '.cm-searchMatch': {
+    backgroundColor: 'rgba(255, 213, 79, 0.25)',
+    outline: '1px solid rgba(255, 213, 79, 0.4)',
+  },
+  '.cm-searchMatch-selected': {
+    backgroundColor: 'rgba(255, 152, 0, 0.35)',
+  },
 }, { dark: true });
 
 // 语法高亮配色（GitHub Dark 风格）
@@ -132,7 +268,7 @@ const darkHighlightStyle = HighlightStyle.define([
 
 const syntaxTheme = syntaxHighlighting(darkHighlightStyle);
 
-export default function FileContentView({ filePath, onClose, editorSession }) {
+export default function FileContentView({ filePath, onClose, editorSession, scrollToLine }) {
   const [content, setContent] = useState(null);
   const [currentContent, setCurrentContent] = useState(null);
   const [error, setError] = useState(null);
@@ -258,6 +394,18 @@ export default function FileContentView({ filePath, onClose, editorSession }) {
     };
   }, [loadFileContent]);
 
+  // 滚动到指定行
+  useEffect(() => {
+    if (scrollToLine && editorViewRef.current && !loading && content !== null) {
+      const view = editorViewRef.current;
+      const lineNum = Math.min(scrollToLine, view.state.doc.lines);
+      const line = view.state.doc.line(lineNum);
+      view.dispatch({
+        effects: EditorView.scrollIntoView(line.from, { y: 'start' }),
+      });
+    }
+  }, [scrollToLine, loading, content]);
+
   const extensions = useMemo(() => {
     const exts = [
       ...getLanguageExtension(filePath),
@@ -313,7 +461,7 @@ export default function FileContentView({ filePath, onClose, editorSession }) {
   return (
     <div className={styles.fileContentView}>
       {editorSession && (
-        <div className={styles.editorBanner}>
+        <div className={styles.editorBanner} onClick={onClose} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onClose(); }}>
           {i18n('ui.editorSession.banner')}
         </div>
       )}

@@ -52,6 +52,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.filePath:hover {
+  color: #79c0ff;
+  text-decoration: underline;
 }
 
 .diffBadge {

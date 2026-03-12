@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.22 (2026-03-13)
+
+- Feature: click file path in GitDiffView to open FileContentView and scroll to first changed line
+- Fix: untracked files in Git Changes now show green "U" instead of raw "??"
+- Enhancement: CodeMirror Find/Replace panel styled to match antd5 dark theme (no gradient, proper input/button sizing)
+- Update: editor session banner text — clearer "click to return to Terminal" wording
+
 ## 1.5.21 (2026-03-13)
 
 - Refactor: replace hardcoded HTTPS cert with plugin hook `httpsOptions` (waterfall)

@@ -3,7 +3,16 @@ import { t } from '../i18n';
 import FullFileDiffView from './FullFileDiffView';
 import styles from './GitDiffView.module.css';
 
-export default function GitDiffView({ filePath, onClose }) {
+function getFirstChangedLine(oldStr, newStr) {
+  const oldLines = (oldStr || '').split('\n');
+  const newLines = (newStr || '').split('\n');
+  for (let i = 0; i < newLines.length; i++) {
+    if (oldLines[i] !== newLines[i]) return i + 1;
+  }
+  return 1;
+}
+
+export default function GitDiffView({ filePath, onClose, onOpenFile }) {
   const [diffData, setDiffData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +64,23 @@ export default function GitDiffView({ filePath, onClose }) {
               <polyline points="15 18 9 12 15 6"/>
             </svg>
           </button>
-          <span className={styles.filePath}>{filePath}</span>
+          <span
+            className={styles.filePath}
+            onClick={() => {
+              if (onOpenFile && diffData) {
+                const line = getFirstChangedLine(diffData.old_content, diffData.new_content);
+                onOpenFile(filePath, line);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if ((e.key === 'Enter' || e.key === ' ') && onOpenFile && diffData) {
+                const line = getFirstChangedLine(diffData.old_content, diffData.new_content);
+                onOpenFile(filePath, line);
+              }
+            }}
+          >{filePath}</span>
           <span className={styles.diffBadge}>DIFF</span>
         </div>
       </div>

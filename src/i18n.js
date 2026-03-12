@@ -3282,24 +3282,24 @@ const i18nData = {
     "th": "ปัจจุบัน", "tr": "Mevcut", "uk": "Поточний"
   },
   "ui.editorSession.banner": {
-    "zh": "正在为 Claude Code 编辑文件 — 保存并关闭以继续",
-    "en": "Editing for Claude Code — save and close to continue",
-    "zh-TW": "正在為 Claude Code 編輯檔案 — 儲存並關閉以繼續",
-    "ko": "Claude Code용 편집 중 — 저장하고 닫으면 계속됩니다",
-    "ja": "Claude Code のために編集中 — 保存して閉じると続行します",
-    "de": "Bearbeitung für Claude Code — speichern und schließen zum Fortfahren",
-    "es": "Editando para Claude Code — guarda y cierra para continuar",
-    "fr": "Édition pour Claude Code — enregistrez et fermez pour continuer",
-    "it": "Modifica per Claude Code — salva e chiudi per continuare",
-    "da": "Redigerer for Claude Code — gem og luk for at fortsætte",
-    "pl": "Edycja dla Claude Code — zapisz i zamknij, aby kontynuować",
-    "ru": "Редактирование для Claude Code — сохраните и закройте для продолжения",
-    "ar": "تحرير لـ Claude Code — احفظ وأغلق للمتابعة",
-    "no": "Redigerer for Claude Code — lagre og lukk for å fortsette",
-    "pt-BR": "Editando para Claude Code — salve e feche para continuar",
-    "th": "กำลังแก้ไขสำหรับ Claude Code — บันทึกและปิดเพื่อดำเนินการต่อ",
-    "tr": "Claude Code için düzenleniyor — kaydet ve kapat ile devam et",
-    "uk": "Редагування для Claude Code — збережіть і закрийте для продовження"
+    "zh": "保存好以后，点我回到「终端」界面",
+    "en": "After saving, click here to return to Terminal",
+    "zh-TW": "儲存好以後，點我回到「終端」介面",
+    "ko": "저장 후 여기를 클릭하여 터미널로 돌아가기",
+    "ja": "保存後、ここをクリックしてターミナルに戻る",
+    "de": "Nach dem Speichern hier klicken, um zum Terminal zurückzukehren",
+    "es": "Después de guardar, haz clic aquí para volver a la Terminal",
+    "fr": "Après avoir enregistré, cliquez ici pour revenir au Terminal",
+    "it": "Dopo aver salvato, clicca qui per tornare al Terminale",
+    "da": "Klik her for at vende tilbage til Terminalen efter at have gemt",
+    "pl": "Po zapisaniu kliknij tutaj, aby wrócić do Terminala",
+    "ru": "После сохранения нажмите здесь, чтобы вернуться в Терминал",
+    "ar": "بعد الحفظ، انقر هنا للعودة إلى الطرفية",
+    "no": "Etter lagring, klikk her for å gå tilbake til Terminalen",
+    "pt-BR": "Após salvar, clique aqui para voltar ao Terminal",
+    "th": "หลังบันทึกแล้ว คลิกที่นี่เพื่อกลับไปที่เทอร์มินัล",
+    "tr": "Kaydettikten sonra Terminal'e dönmek için buraya tıklayın",
+    "uk": "Після збереження натисніть тут, щоб повернутися до Терміналу"
   }
 };
 

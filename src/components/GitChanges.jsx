@@ -11,6 +11,11 @@ const STATUS_COLORS = {
   'C': '#73c991',
   'U': '#e2c08d',
   '?': '#73c991',
+  '??': '#73c991',
+};
+
+const STATUS_LABELS = {
+  '??': 'U',
 };
 
 const EXT_COLORS = {
@@ -82,7 +87,7 @@ function TreeDir({ name, node, depth, onFileClick, selectedFile }) {
           <span className={styles.icon}>{getFileIcon(file.name)}</span>
           <span className={styles.fileName}>{file.name}</span>
           <span className={styles.status} style={{ color: STATUS_COLORS[file.status] || '#888' }}>
-            {file.status}
+            {STATUS_LABELS[file.status] || file.status}
           </span>
         </div>
       ))}
