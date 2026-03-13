@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.23 (2026-03-13)
+
+- Feature: inject Claude process PID (`entry.pid`) into `onNewEntry` plugin hook — CLI mode uses PTY child PID, hook-injection mode uses `process.pid`
+- Add: `getPtyPid()` export in pty-manager.js
+
 ## 1.5.22 (2026-03-13)
 
 - Feature: click file path in GitDiffView to open FileContentView and scroll to first changed line
