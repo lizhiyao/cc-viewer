@@ -114,12 +114,14 @@ function installShellHook(isNative) {
     let content = existsSync(configPath) ? readFileSync(configPath, 'utf-8') : '';
 
     if (content.includes(SHELL_HOOK_START)) {
-      // Check if existing hook matches desired mode
-      const isNativeHook = content.includes('ccv run -- claude');
-      if (!!isNative === !!isNativeHook) {
+      const hook = buildShellHook(isNative);
+      // Extract existing hook content
+      const regex = new RegExp(`${SHELL_HOOK_START}[\\s\\S]*?${SHELL_HOOK_END}`);
+      const existingMatch = content.match(regex);
+      if (existingMatch && existingMatch[0] === hook) {
         return { path: configPath, status: 'exists' };
       }
-      // Mismatch: remove old hook first
+      // Hook content differs: remove old and reinstall
       removeShellHook();
       content = existsSync(configPath) ? readFileSync(configPath, 'utf-8') : '';
     }

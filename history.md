@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.23 (2026-03-13)
+
+- Fix: `claude -v` / `claude --version` / `claude -h` no longer triggers ccv startup — passthrough flags now work correctly
+- Fix: `installShellHook` now compares hook content instead of just mode, so outdated hooks are automatically replaced on `ccv -logger`
+
 ## 1.5.22 (2026-03-13)
 
 - Feature: click file path in GitDiffView to open FileContentView and scroll to first changed line
