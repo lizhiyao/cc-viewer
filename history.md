@@ -1,9 +1,10 @@
 # Changelog
 
-## 1.5.38 (2026-03-16)
+## 1.5.39 (2026-03-16)
 
 - Feature: AskUserQuestion interactive UI — pending questions render Radio/Checkbox controls with submit button in chat panel (single-select, multi-select, Other with text input, markdown preview layout)
 - Fix: statusLine non-exclusive — no longer modifies user's `statusLine` in settings.json; context window data is now extracted from API response usage in the interceptor
+- Fix: ExitPlanMode approval buttons now render immediately without waiting for PTY prompt detection; uses built-in default options as fallback
 - i18n: added askSubmit, askSubmitting, askOther, askOtherPlaceholder entries for all 18 supported languages
 
 ## 1.5.37 (2026-03-16)

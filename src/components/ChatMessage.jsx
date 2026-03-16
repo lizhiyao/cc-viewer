@@ -358,10 +358,17 @@ class ChatMessage extends React.Component {
       const { planApprovalMap } = this.props;
       const approval = (planApprovalMap && planApprovalMap[tu.id]) || { status: 'pending' };
       const isPending = approval.status === 'pending';
-      const planPrompt = isPlanApprovalPrompt(this.props.ptyPrompt)
+      const isInteractive = isPending && this.props.cliMode && tu.id === this.props.lastPendingPlanId;
+      // plan 审批选项：优先用 ptyPrompt 检测到的，否则用内置默认选项
+      const detectedPrompt = isPlanApprovalPrompt(this.props.ptyPrompt)
         ? this.props.ptyPrompt
         : this.props.activePlanPrompt || null;
-      const isInteractive = isPending && this.props.cliMode && !!planPrompt && tu.id === this.props.lastPendingPlanId;
+      const defaultPlanOptions = [
+        { number: 1, text: 'Approve plan', selected: true },
+        { number: 2, text: 'Approve plan with edits', selected: false },
+        { number: 3, text: 'Deny plan', selected: false },
+      ];
+      const planOptions = detectedPrompt ? detectedPrompt.options : defaultPlanOptions;
       const statusClass = approval.status === 'approved' ? styles.planStatusApproved
         : approval.status === 'rejected' ? styles.planStatusRejected
         : styles.planStatusPending;
@@ -387,7 +394,7 @@ class ChatMessage extends React.Component {
           )}
           {isInteractive && !this.state.planFeedbackInput && (
             <div className={styles.planApprovalActions}>
-              {planPrompt.options.map(opt => {
+              {planOptions.map(opt => {
                 const txt = opt.text.toLowerCase();
                 let btnCls = styles.planOptionBtn;
                 if (/yes|approve|accept|proceed/i.test(txt)) btnCls = styles.planApproveBtn;
