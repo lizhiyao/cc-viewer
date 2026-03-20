@@ -66,6 +66,14 @@ export default {
 
 ## Available Hooks
 
+| Hook | Type | Parameters | Returns | Trigger |
+|------|------|------------|---------|---------|
+| `httpsOptions` | waterfall | `{}` | TLS options | Before server creation |
+| `localUrl` | waterfall | `{ url, ip, port, token }` | `{ url }` | `/api/local-url` |
+| `serverStarted` | parallel | `{ port, host, url, ip, token, protocol }` | ignored | After server start |
+| `serverStopping` | parallel | `{}` | ignored | Before server stop |
+| `onNewEntry` | parallel | `entry` | ignored | New JSONL entry |
+
 ### `httpsOptions` — Waterfall
 
 Triggered at server startup to obtain HTTPS certificate options. If the returned object contains `pfx` or `cert`, the server starts in HTTPS mode; otherwise it falls back to HTTP.
@@ -270,27 +278,28 @@ export default {
 };
 ```
 
-## POC Example: Skill Version Evaluation Plugin
+## Example: Context Engineering Evaluation Plugin
 
-A ready-to-use POC plugin is included in this repository:
+A ready-to-use version evaluation plugin is included in this repository:
 
-`examples/plugins/skill-eval-poc/index.mjs`
+`examples/plugins/context-engineering-evaluator/index.mjs`
 
 Install it into your plugin directory:
 
 ```bash
 mkdir -p ~/.claude/cc-viewer/plugins
-cp examples/plugins/skill-eval-poc/index.mjs ~/.claude/cc-viewer/plugins/skill-eval-poc.mjs
+cp examples/plugins/context-engineering-evaluator/index.mjs ~/.claude/cc-viewer/plugins/context-engineering-evaluator.mjs
 ```
 
 Add labels in prompts during evaluation runs:
 
 ```text
-[variant:v1] [sample_id:s001] ...
-[variant:v2] [sample_id:s001] ...
+[artifact_type:skill] [variant:v1] [sample_id:s001] ...
+[artifact_type:skill] [variant:v2] [sample_id:s001] ...
+[artifact_type:knowledge_pack] [variant:2026-03-21] [sample_id:k001] ...
 ```
 
-The plugin aggregates metrics by `variant + teammate + sample_id`:
+The plugin aggregates metrics by `artifact_type + variant + teammate + sample_id`:
 
 - requestCount
 - errorCount
@@ -301,7 +310,11 @@ The plugin aggregates metrics by `variant + teammate + sample_id`:
 
 Output file:
 
-`tmp/skill-eval-poc-report.json`
+`tmp/context-engineering-evaluator-report.json`
+
+Detailed execution guide:
+
+`examples/plugins/context-engineering-evaluator/SOLUTION.zh.md`
 
 ## Notes
 
