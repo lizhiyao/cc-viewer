@@ -14,11 +14,17 @@ export async function callClaude({ model, system, prompt }) {
     : ['-p', prompt, '--output-format', 'json', '--model', model];
   if (system) args.push('--system-prompt', system);
 
+  // CCV_EVAL_CWD controls the workspace name in cc-viewer logs.
+  // Set it to the project root so eval requests appear in the same
+  // cc-viewer workspace as the user's main session.
+  const cwd = process.env.CCV_EVAL_CWD || undefined;
+
   const start = Date.now();
   try {
     const { stdout } = await execFileAsync(bin, args, {
       maxBuffer: 10 * 1024 * 1024,
       timeout: 120_000,
+      ...(cwd && { cwd }),
     });
     const durationMs = Date.now() - start;
     const data = JSON.parse(stdout);

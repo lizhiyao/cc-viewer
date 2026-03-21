@@ -25,8 +25,12 @@ ccv
 ```bash
 cd /path/to/cc-viewer/examples/plugins/context-engineering-evaluator
 
-node eval-cli.mjs --variants v1,v2
+# CCV_EVAL_CWD 指向 cc-viewer 项目根目录，
+# 这样评测请求会出现在终端 1 的 cc-viewer 工作空间中
+CCV_EVAL_CWD=/path/to/cc-viewer node eval-cli.mjs --variants v1,v2
 ```
+
+> 如果不设置 `CCV_EVAL_CWD`，评测日志会写入一个独立的工作空间，终端 1 的 cc-viewer 看不到。
 
 你会看到逐条执行的进度：
 
