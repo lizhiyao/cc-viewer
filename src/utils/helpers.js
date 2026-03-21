@@ -491,19 +491,24 @@ export function findPrevMainAgentTimestamp(requests, startIndex) {
 export function extractCachedContent(requests) {
   if (!Array.isArray(requests) || requests.length === 0) return null;
 
-  // 逆序查找最新的 MainAgent 请求
+  // 逆序查找最新的 MainAgent 请求，优先选有 response.usage 的
   let latestMainAgent = null;
+  let latestMainAgentWithUsage = null;
   for (let i = requests.length - 1; i >= 0; i--) {
     if (isMainAgent(requests[i])) {
-      latestMainAgent = requests[i];
-      break;
+      if (!latestMainAgent) latestMainAgent = requests[i];
+      if (requests[i].response?.body?.usage) {
+        latestMainAgentWithUsage = requests[i];
+        break;
+      }
     }
   }
+  const chosen = latestMainAgentWithUsage || latestMainAgent;
 
-  if (!latestMainAgent || !latestMainAgent.body) return null;
+  if (!chosen || !chosen.body) return null;
 
-  const body = latestMainAgent.body;
-  const usage = latestMainAgent.response?.body?.usage;
+  const body = chosen.body;
+  const usage = chosen.response?.body?.usage;
 
   const result = {
     system: [],
