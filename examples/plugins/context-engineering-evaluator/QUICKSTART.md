@@ -16,7 +16,7 @@
 ccv
 ```
 
-浏览器会自动打开 cc-viewer 界面（默认 `http://127.0.0.1:7009`），保持运行。
+通常会自动打开 cc-viewer 界面（默认从 `http://127.0.0.1:7008` 开始，端口占用时会顺延）；如果未自动打开，请手动访问该地址。
 
 ## 第二步：运行评测
 
@@ -62,7 +62,7 @@ node eval-cli.mjs --variants v1,v2
 node -e "import{createReportServer}from'./lib/report-server.mjs';const s=createReportServer();await s.start();await new Promise(()=>{})"
 ```
 
-浏览器打开 **http://127.0.0.1:7799**：
+浏览器打开 **<http://127.0.0.1:7799**：>
 
 1. **运行列表页** — 展示所有评测记录
 2. 点击某次运行进入**对比报告页**：
