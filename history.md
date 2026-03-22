@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.18 (2026-03-22)
+
+- Feature: user preferences section in Display Settings — "Default log resume behavior" with master switch and continue/new radio options
+- Feature: resume dialog "Remember my choice" checkbox — skip dialog next time with saved preference
+- Fix: AppHeader shouldComponentUpdate now includes resumeAutoChoice for proper re-render
+
 ## 1.6.17 (2026-03-22)
 
 - Feature: file browser inline rename — double-click or press Enter/F2 on selected file to edit name in-place

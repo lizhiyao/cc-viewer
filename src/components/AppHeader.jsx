@@ -1,5 +1,5 @@
 import React from 'react';
-import { Space, Tag, Button, Dropdown, Popover, Modal, Collapse, Drawer, Switch, Tabs, Spin, Input, Table, message } from 'antd';
+import { Space, Tag, Button, Dropdown, Popover, Modal, Collapse, Drawer, Switch, Radio, Tabs, Spin, Input, Table, message } from 'antd';
 import { MessageOutlined, FileTextOutlined, ImportOutlined, DashboardOutlined, ExportOutlined, DownloadOutlined, SettingOutlined, BarChartOutlined, CodeOutlined, GlobalOutlined, CopyOutlined, ApiOutlined, DeleteOutlined, ReloadOutlined, PlusOutlined, CloudDownloadOutlined } from '@ant-design/icons';
 import { QRCodeCanvas } from 'qrcode.react';
 import { formatTokenCount, computeTokenStats, computeCacheRebuildStats, computeToolUsageStats, computeSkillUsageStats, getModelMaxTokens, extractCachedContent } from '../utils/helpers';
@@ -78,6 +78,7 @@ class AppHeader extends React.Component {
       nextProps.filterIrrelevant !== this.props.filterIrrelevant ||
       nextProps.cliMode !== this.props.cliMode ||
       nextProps.contextWindow !== this.props.contextWindow ||
+      nextProps.resumeAutoChoice !== this.props.resumeAutoChoice ||
       nextState !== this.state
     );
   }
@@ -1115,7 +1116,7 @@ class AppHeader extends React.Component {
   }
 
   render() {
-    const { requestCount, requests = [], viewMode, cacheType, onToggleViewMode, onImportLocalLogs, onLangChange, isLocalLog, localLogFile, projectName, collapseToolResults, onCollapseToolResultsChange, expandThinking, onExpandThinkingChange, expandDiff, onExpandDiffChange, filterIrrelevant, onFilterIrrelevantChange, updateInfo, onDismissUpdate, cliMode, terminalVisible, onToggleTerminal, onReturnToWorkspaces, contextWindow, serverCachedContent } = this.props;
+    const { requestCount, requests = [], viewMode, cacheType, onToggleViewMode, onImportLocalLogs, onLangChange, isLocalLog, localLogFile, projectName, collapseToolResults, onCollapseToolResultsChange, expandThinking, onExpandThinkingChange, expandDiff, onExpandDiffChange, filterIrrelevant, onFilterIrrelevantChange, updateInfo, onDismissUpdate, cliMode, terminalVisible, onToggleTerminal, onReturnToWorkspaces, contextWindow, serverCachedContent, resumeAutoChoice, onResumeAutoChoiceToggle, onResumeAutoChoiceChange } = this.props;
     const { countdownText } = this.state;
 
     const menuItems = [
@@ -1450,6 +1451,28 @@ class AppHeader extends React.Component {
                 onChange={(checked) => onExpandThinkingChange && onExpandThinkingChange(checked)}
               />
             </div>
+          </div>
+          <div className={styles.settingsGroupBox}>
+            <div className={styles.settingsGroupTitle}>{t('ui.userPreferences')}</div>
+            <div className={styles.settingsItem}>
+              <span className={styles.settingsLabel}>{t('ui.resumeAutoChoice')}</span>
+              <Switch
+                checked={!!resumeAutoChoice}
+                onChange={(checked) => onResumeAutoChoiceToggle && onResumeAutoChoiceToggle(checked)}
+              />
+            </div>
+            {resumeAutoChoice && (
+              <div className={styles.settingsItem}>
+                <Radio.Group
+                  value={resumeAutoChoice}
+                  onChange={(e) => onResumeAutoChoiceChange && onResumeAutoChoiceChange(e.target.value)}
+                  size="small"
+                >
+                  <Radio value="continue">{t('ui.resumeAutoChoice.continue')}</Radio>
+                  <Radio value="new">{t('ui.resumeAutoChoice.new')}</Radio>
+                </Radio.Group>
+              </div>
+            )}
           </div>
         </Drawer>
         <Drawer

@@ -52,6 +52,8 @@ class App extends React.Component {
       projectName: '',      // 当前监控的项目名称
       resumeModalVisible: false,
       resumeFileName: '',
+      resumeRememberChoice: false,
+      resumeAutoChoice: null, // null | "continue" | "new"
       collapseToolResults: true,
       expandThinking: true,
       expandDiff: false,
@@ -136,6 +138,9 @@ class App extends React.Component {
         }
         if (data.expandDiff !== undefined) {
           this.setState({ expandDiff: !!data.expandDiff });
+        }
+        if (data.resumeAutoChoice) {
+          this.setState({ resumeAutoChoice: data.resumeAutoChoice });
         }
         // filterIrrelevant 默认 true，showAll = !filterIrrelevant
         const filterIrrelevant = data.filterIrrelevant !== undefined ? !!data.filterIrrelevant : true;
@@ -259,11 +264,16 @@ class App extends React.Component {
       this.eventSource.addEventListener('resume_prompt', (event) => {
         try {
           const data = JSON.parse(event.data);
-          this.setState({ resumeModalVisible: true, resumeFileName: data.recentFileName || '' });
+          if (this.state.resumeAutoChoice) {
+            // 用户偏好已启用，自动执行选择，跳过弹窗
+            this.handleResumeChoice(this.state.resumeAutoChoice);
+          } else {
+            this.setState({ resumeModalVisible: true, resumeFileName: data.recentFileName || '' });
+          }
         } catch { }
       });
       this.eventSource.addEventListener('resume_resolved', () => {
-        this.setState({ resumeModalVisible: false, resumeFileName: '' });
+        this.setState({ resumeModalVisible: false, resumeFileName: '', resumeRememberChoice: false });
       });
       this.eventSource.addEventListener('update_completed', (event) => {
         try {
@@ -1271,11 +1281,39 @@ class App extends React.Component {
   };
 
   handleResumeChoice = (choice) => {
+    // 如果勾选了"记住选择"，保存到偏好
+    if (this.state.resumeRememberChoice) {
+      this.setState({ resumeAutoChoice: choice });
+      fetch(apiUrl('/api/preferences'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resumeAutoChoice: choice }),
+      }).catch(() => {});
+    }
     fetch(apiUrl('/api/resume-choice'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ choice }),
     }).catch(err => console.error('resume-choice failed:', err));
+  };
+
+  handleResumeAutoChoiceToggle = (enabled) => {
+    const value = enabled ? 'continue' : null;
+    this.setState({ resumeAutoChoice: value });
+    fetch(apiUrl('/api/preferences'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resumeAutoChoice: value }),
+    }).catch(() => {});
+  };
+
+  handleResumeAutoChoiceChange = (value) => {
+    this.setState({ resumeAutoChoice: value });
+    fetch(apiUrl('/api/preferences'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resumeAutoChoice: value }),
+    }).catch(() => {});
   };
 
   handleLoadLocalJsonlFile = () => {
@@ -1836,6 +1874,9 @@ class App extends React.Component {
               contextWindow={this.state.contextWindow}
               onNavigateCacheMsg={this.handleNavigateCacheMsg}
               serverCachedContent={this.state.serverCachedContent}
+              resumeAutoChoice={this.state.resumeAutoChoice}
+              onResumeAutoChoiceToggle={this.handleResumeAutoChoiceToggle}
+              onResumeAutoChoiceChange={this.handleResumeAutoChoiceChange}
             />
           </Layout.Header>
 
@@ -1934,14 +1975,27 @@ class App extends React.Component {
           closable={false}
           maskClosable={false}
           keyboard={false}
-          footer={[
-            <Button key="continue" type="primary" onClick={() => this.handleResumeChoice('continue')}>
-              {t('ui.resume.continue')}
-            </Button>,
-            <Button key="new" onClick={() => this.handleResumeChoice('new')}>
-              {t('ui.resume.new')}
-            </Button>,
-          ]}
+          footer={
+            <div>
+              <div style={{ textAlign: 'right', marginBottom: 8 }}>
+                <Button key="continue" type="primary" onClick={() => this.handleResumeChoice('continue')} style={{ marginRight: 8 }}>
+                  {t('ui.resume.continue')}
+                </Button>
+                <Button key="new" onClick={() => this.handleResumeChoice('new')}>
+                  {t('ui.resume.new')}
+                </Button>
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <Checkbox
+                  checked={this.state.resumeRememberChoice}
+                  onChange={(e) => this.setState({ resumeRememberChoice: e.target.checked })}
+                  style={{ opacity: 0.6 }}
+                >
+                  <span style={{ opacity: 0.6 }}>{t('ui.resume.remember')}</span>
+                </Checkbox>
+              </div>
+            </div>
+          }
         >
           <p>{t('ui.resume.message', { file: this.state.resumeFileName })}</p>
         </Modal>
