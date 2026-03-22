@@ -230,12 +230,12 @@ async function handleRequest(req, res) {
               const s = JSON.parse(readFileSync(p, 'utf-8'));
               if (s?.env?.ANTHROPIC_BASE_URL) return s.env.ANTHROPIC_BASE_URL.replace(/\/$/, '');
             }
-          } catch {}
+          } catch { }
         }
         return 'https://api.anthropic.com';
       })();
-      const fullUrl = `${baseUrl}/${url.slice(1)}`;
 
+      const fullUrl = `${baseUrl}/${url.slice(1)}`;
       const fetchOptions = { method: req.method, headers };
       if (body.length > 0) fetchOptions.body = body;
 
@@ -254,7 +254,7 @@ async function handleRequest(req, res) {
           res.writeHead(response.status, responseHeaders);
           res.end(errorText);
           return;
-        } catch {}
+        } catch { }
       }
 
       res.writeHead(response.status, responseHeaders);
@@ -356,7 +356,7 @@ async function handleRequest(req, res) {
 
   if (url === '/api/preferences' && method === 'GET') {
     let prefs = {};
-    try { if (existsSync(PREFS_FILE)) prefs = JSON.parse(readFileSync(PREFS_FILE, 'utf-8')); } catch {}
+    try { if (existsSync(PREFS_FILE)) prefs = JSON.parse(readFileSync(PREFS_FILE, 'utf-8')); } catch { }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(prefs));
     return;
@@ -369,7 +369,7 @@ async function handleRequest(req, res) {
       try {
         const incoming = JSON.parse(body);
         let prefs = {};
-        try { if (existsSync(PREFS_FILE)) prefs = JSON.parse(readFileSync(PREFS_FILE, 'utf-8')); } catch {}
+        try { if (existsSync(PREFS_FILE)) prefs = JSON.parse(readFileSync(PREFS_FILE, 'utf-8')); } catch { }
         Object.assign(prefs, incoming);
         writeFileSync(PREFS_FILE, JSON.stringify(prefs, null, 2));
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -430,14 +430,14 @@ async function handleRequest(req, res) {
         clients.forEach(client => {
           try {
             client.write(`event: resume_resolved\ndata: ${resolvedData}\n\n`);
-          } catch {}
+          } catch { }
         });
         // 发送 full_reload 让客户端重新加载数据
         const entries = readLogFile(LOG_FILE);
         clients.forEach(client => {
           try {
             client.write(`event: full_reload\ndata: ${JSON.stringify(entries)}\n\n`);
-          } catch {}
+          } catch { }
         });
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, logFile: result.logFile }));
@@ -470,7 +470,7 @@ async function handleRequest(req, res) {
               const prefs = JSON.parse(readFileSync(PREFS_FILE, 'utf-8'));
               if (prefs.lang) targetLang = prefs.lang;
             }
-          } catch {}
+          } catch { }
           if (!targetLang) targetLang = detectLanguage();
         }
 
@@ -807,7 +807,7 @@ async function handleRequest(req, res) {
           const data = { ...cw, context_window_size: contextSize, used_percentage: usedPct, remaining_percentage: 100 - usedPct };
           res.write(`event: context_window\ndata: ${JSON.stringify(data)}\n\n`);
         }
-      } catch {}
+      } catch { }
     }
 
     req.on('close', () => {
@@ -882,7 +882,7 @@ async function handleRequest(req, res) {
           if (existsSync(statsFile)) {
             try {
               allStats[project] = JSON.parse(readFileSync(statsFile, 'utf-8'));
-            } catch {}
+            } catch { }
           }
         }
       }
@@ -1285,7 +1285,7 @@ async function handleRequest(req, res) {
           if (existsSync(pluginDir) && readdirSync(pluginDir).length === 0) {
             rmdirSync(pluginDir);
           }
-        } catch {}
+        } catch { }
       }
       await loadPlugins();
       const plugins = getPluginsInfo();
@@ -1407,8 +1407,8 @@ async function handleRequest(req, res) {
           });
           const parsed = JSON.parse(result);
           if (parsed.name) saveName = parsed.name;
-        } catch {}
-        try { unlinkSync(tmpFile); } catch {}
+        } catch { }
+        try { unlinkSync(tmpFile); } catch { }
         // fallback：从 URL 路径提取文件名，排除通用名称
         if (!saveName) {
           const urlFilename = parsedUrl.pathname.split('/').pop();
@@ -1480,7 +1480,7 @@ async function handleRequest(req, res) {
             if (existsSync(statsFile)) {
               statsFiles = JSON.parse(readFileSync(statsFile, 'utf-8')).files;
             }
-          } catch {}
+          } catch { }
           for (const f of files) {
             const match = f.match(/^(.+?)_(\d{8}_\d{6})\.jsonl$/);
             if (!match) continue;
@@ -1941,7 +1941,7 @@ export async function startViewer() {
               const cmd = platform() === 'darwin' ? 'open' : platform() === 'win32' ? 'start' : 'xdg-open';
               execAsync(`${cmd} ${url}`, { timeout: 5000 }).catch(() => {});
             }
-          } catch {}
+          } catch { }
           // 工作区模式下延迟到选择工作区后再启动监听
           if (!isWorkspaceMode) {
             readModelContextSize(); // Cache model→size mapping at startup
@@ -2135,7 +2135,7 @@ export function stopViewer() {
   return _stoppingPromise;
 }
 async function _doStop() {
-  try { await Promise.race([runParallelHook('serverStopping'), new Promise(r => setTimeout(r, 3000))]); } catch {}
+  try { await Promise.race([runParallelHook('serverStopping'), new Promise(r => setTimeout(r, 3000))]); } catch { }
   // 如果用户未做选择，将临时文件转为正式文件
   if (_resumeState && _resumeState.tempFile) {
     try {
@@ -2150,7 +2150,7 @@ async function _doStop() {
           unlinkSync(tempFile);
         }
       }
-    } catch {}
+    } catch { }
   }
   for (const logFile of getWatchedFiles().keys()) {
     unwatchFile(logFile);
@@ -2179,14 +2179,14 @@ if (!isWorkspaceMode) {
         checkAndUpdate().then(result => {
           if (result.status === 'updated') {
             clients.forEach(client => {
-              try { client.write(`event: update_completed\ndata: ${JSON.stringify({ version: result.remoteVersion })}\n\n`); } catch {}
+              try { client.write(`event: update_completed\ndata: ${JSON.stringify({ version: result.remoteVersion })}\n\n`); } catch { }
             });
           } else if (result.status === 'major_available') {
             clients.forEach(client => {
-              try { client.write(`event: update_major_available\ndata: ${JSON.stringify({ version: result.remoteVersion })}\n\n`); } catch {}
+              try { client.write(`event: update_major_available\ndata: ${JSON.stringify({ version: result.remoteVersion })}\n\n`); } catch { }
             });
           }
-        }).catch(() => {});
+        }).catch(() => { });
       }, 3000);
     }).catch(err => {
       console.error('Failed to start CC Viewer:', err);
@@ -2202,7 +2202,7 @@ function handleExit() {
         const newPath = _resumeState.tempFile.replace('_temp.jsonl', '.jsonl');
         renameSync(_resumeState.tempFile, newPath);
       }
-    } catch {}
+    } catch { }
   }
 }
 process.on('exit', handleExit);
