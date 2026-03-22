@@ -207,6 +207,72 @@ async function handleRequest(req, res) {
     return;
   }
 
+  // API 代理：将 /v1/* 请求转发到 Anthropic API，通过已 patch 的 fetch 自动记录日志
+  if (url.startsWith('/v1/')) {
+    try {
+      const headers = { ...req.headers };
+      delete headers.host;
+      headers['x-cc-viewer-trace'] = 'true';
+
+      const buffers = [];
+      for await (const chunk of req) buffers.push(chunk);
+      const body = Buffer.concat(buffers);
+
+      // 获取上游 API 地址：优先从 settings 读取，避免使用可能指向自身的 ANTHROPIC_BASE_URL 环境变量
+      const baseUrl = (() => {
+        const settingsPaths = [
+          join(homedir(), '.claude', 'settings.local.json'),
+          join(homedir(), '.claude', 'settings.json'),
+        ];
+        for (const p of settingsPaths) {
+          try {
+            if (existsSync(p)) {
+              const s = JSON.parse(readFileSync(p, 'utf-8'));
+              if (s?.env?.ANTHROPIC_BASE_URL) return s.env.ANTHROPIC_BASE_URL.replace(/\/$/, '');
+            }
+          } catch {}
+        }
+        return 'https://api.anthropic.com';
+      })();
+      const fullUrl = `${baseUrl}/${url.slice(1)}`;
+
+      const fetchOptions = { method: req.method, headers };
+      if (body.length > 0) fetchOptions.body = body;
+
+      const response = await fetch(fullUrl, fetchOptions);
+
+      const responseHeaders = {};
+      for (const [key, value] of response.headers.entries()) {
+        if (!['content-encoding', 'transfer-encoding', 'content-length'].includes(key.toLowerCase())) {
+          responseHeaders[key] = value;
+        }
+      }
+
+      if (!response.ok) {
+        try {
+          const errorText = await response.text();
+          res.writeHead(response.status, responseHeaders);
+          res.end(errorText);
+          return;
+        } catch {}
+      }
+
+      res.writeHead(response.status, responseHeaders);
+      if (response.body) {
+        const { Readable, pipeline } = await import('node:stream');
+        const nodeStream = Readable.fromWeb(response.body);
+        nodeStream.on('error', () => {});
+        pipeline(nodeStream, res, () => {});
+      } else {
+        res.end();
+      }
+    } catch (err) {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Proxy Error', message: err.message }));
+    }
+    return;
+  }
+
   // 局域网访问 token 验证（本地 127.0.0.1 / ::1 免验证，静态资源免验证）
   const remoteIp = req.socket.remoteAddress;
   const isLocal = remoteIp === '127.0.0.1' || remoteIp === '::1' || remoteIp === '::ffff:127.0.0.1';

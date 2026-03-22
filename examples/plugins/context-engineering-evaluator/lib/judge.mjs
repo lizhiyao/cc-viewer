@@ -7,24 +7,22 @@ export const DEFAULT_MODEL = 'sonnet';
 export const JUDGE_MODEL = 'haiku';
 
 export async function callClaude({ model, system, prompt }) {
-  // Use 'ccv' if available (routes through cc-viewer), fallback to 'claude'
-  const bin = process.env.CCV_EVAL_BIN || 'ccv';
-  const args = bin === 'ccv'
-    ? ['run', '--', 'claude', '-p', prompt, '--output-format', 'json', '--model', model]
-    : ['-p', prompt, '--output-format', 'json', '--model', model];
+  const args = ['-p', prompt, '--output-format', 'json', '--model', model];
   if (system) args.push('--system-prompt', system);
 
-  // CCV_EVAL_CWD controls the workspace name in cc-viewer logs.
-  // Set it to the project root so eval requests appear in the same
-  // cc-viewer workspace as the user's main session.
-  const cwd = process.env.CCV_EVAL_CWD || undefined;
+  // CCV_PROXY_URL: 指向已运行的 cc-viewer 服务端口（如 http://127.0.0.1:7008）
+  // 设置后，claude -p 的 API 请求会经过 cc-viewer 代理，实时出现在 Web UI 中
+  const proxyUrl = process.env.CCV_PROXY_URL || undefined;
+  const env = proxyUrl
+    ? { ...process.env, ANTHROPIC_BASE_URL: proxyUrl }
+    : { ...process.env };
 
   const start = Date.now();
   try {
-    const { stdout } = await execFileAsync(bin, args, {
+    const { stdout } = await execFileAsync('claude', args, {
       maxBuffer: 10 * 1024 * 1024,
       timeout: 120_000,
-      ...(cwd && { cwd }),
+      env,
     });
     const durationMs = Date.now() - start;
     const data = JSON.parse(stdout);
