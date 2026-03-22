@@ -66,7 +66,7 @@ CCV_PROXY_URL=http://127.0.0.1:7008 node eval-cli.mjs --variants v1,v2
 node -e "import{createReportServer}from'./lib/report-server.mjs';const s=createReportServer();await s.start();await new Promise(()=>{})"
 ```
 
-浏览器打开 **<http://127.0.0.1:7799**：>
+浏览器打开 <http://127.0.0.1:7799>
 
 1. **运行列表页** — 展示所有评测记录
 2. 点击某次运行进入**对比报告页**：
