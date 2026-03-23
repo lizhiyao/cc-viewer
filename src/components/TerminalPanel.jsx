@@ -1,5 +1,5 @@
 import React from 'react';
-import { message, Tooltip } from 'antd';
+import { message, Tooltip, Popover, Button } from 'antd';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
@@ -643,6 +643,17 @@ class TerminalPanel extends React.Component {
     message.info('功能正在开发中...马上就有！');
   };
 
+  handleEnableAgentTeam = () => {
+    if (this.state.agentTeamEnabling) return;
+    this.setState({ agentTeamEnabling: true });
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const prompt = 'Add "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" to the env object in ~/.claude/settings.json. If the env key does not exist, create it. Preserve all existing content. Only modify this one field.';
+      this.ws.send(JSON.stringify({ type: 'input', data: prompt + '\r' }));
+      message.success('需要重启 Claude Code 才能生效');
+    }
+    if (this.terminal) this.terminal.focus();
+  };
+
   handleUltrathink = () => {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ type: 'input', data: 'ultrathink ' }));
@@ -665,17 +676,29 @@ class TerminalPanel extends React.Component {
               <UltrathinkIcon />
               <span>{t('ui.terminal.ultrathink')}</span>
             </button>
-            <Tooltip title={this.state.agentTeamEnabled ? '' : t('ui.terminal.agentTeamDisabledTip')} placement="top">
-              <button
-                className={`${styles.toolbarBtn} ${!this.state.agentTeamEnabled ? styles.toolbarBtnDisabled : ''}`}
-                disabled={!this.state.agentTeamEnabled}
-                onClick={this.handleAgentTeam}
-                title={t('ui.terminal.agentTeam')}
-              >
+            {this.state.agentTeamEnabled ? (
+              <button className={styles.toolbarBtn} onClick={this.handleAgentTeam} title={t('ui.terminal.agentTeam')}>
                 <AgentTeamIcon />
                 <span>{t('ui.terminal.agentTeam')}</span>
               </button>
-            </Tooltip>
+            ) : (
+              <Popover
+                trigger="click"
+                placement="top"
+                overlayInnerStyle={{ background: '#1e1e1e', border: '1px solid #3a3a3a', borderRadius: 8, padding: '12px 16px', maxWidth: 360 }}
+                content={
+                  <div>
+                    <div style={{ color: '#ccc', fontSize: 13, marginBottom: 10 }}>{t('ui.terminal.agentTeamDisabledTip')}</div>
+                    <Button type="primary" size="small" loading={this.state.agentTeamEnabling} disabled={this.state.agentTeamEnabling} onClick={this.handleEnableAgentTeam}>{this.state.agentTeamEnabling ? t('ui.terminal.agentTeamEnabling') : t('ui.terminal.agentTeamEnable')}</Button>
+                  </div>
+                }
+              >
+                <button className={`${styles.toolbarBtn} ${styles.toolbarBtnDisabled}`} title={t('ui.terminal.agentTeam')}>
+                  <AgentTeamIcon />
+                  <span>{t('ui.terminal.agentTeam')}</span>
+                </button>
+              </Popover>
+            )}
           </div>
         )}
         {isMobile && (

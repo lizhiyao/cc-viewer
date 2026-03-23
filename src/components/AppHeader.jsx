@@ -100,7 +100,7 @@ class AppHeader extends React.Component {
     if (this._rafId) cancelAnimationFrame(this._rafId);
     if (this._expiredTimer) clearTimeout(this._expiredTimer);
     if (!this.props.cacheExpireAt) {
-      this.setState({ countdownText: '' });
+      if (this.state.countdownText !== '') this.setState({ countdownText: '' });
       return;
     }
     this._rafId = requestAnimationFrame(this.updateCountdown);
@@ -109,15 +109,16 @@ class AppHeader extends React.Component {
   updateCountdown() {
     const { cacheExpireAt } = this.props;
     if (!cacheExpireAt) {
-      this.setState({ countdownText: '' });
+      if (this.state.countdownText !== '') this.setState({ countdownText: '' });
       return;
     }
 
     const remaining = Math.max(0, cacheExpireAt - Date.now());
     if (remaining <= 0) {
-      this.setState({ countdownText: t('ui.cacheExpired') });
+      const expired = t('ui.cacheExpired');
+      if (this.state.countdownText !== expired) this.setState({ countdownText: expired });
       this._expiredTimer = setTimeout(() => {
-        this.setState({ countdownText: '' });
+        if (this.state.countdownText !== '') this.setState({ countdownText: '' });
       }, 5000);
       return;
     }
@@ -131,7 +132,7 @@ class AppHeader extends React.Component {
     } else {
       text = t('ui.second', { s: totalSec });
     }
-    this.setState({ countdownText: text });
+    if (text !== this.state.countdownText) this.setState({ countdownText: text });
     this._rafId = requestAnimationFrame(this.updateCountdown);
   }
 

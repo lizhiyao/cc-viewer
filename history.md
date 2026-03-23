@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.26 (2026-03-23)
+
+- Perf: fix AppHeader per-frame re-render — countdown rAF now only setState when text changes (~60/s → ~1/s)
+- Feature: Agent Team button Popover with "Enable Now" button that sends config prompt to terminal
+- Feature: "Enable Now" button shows loading state to prevent duplicate submission
+- Fix: blood bar precise mode uses settings.json model for context size correction
+
 ## 1.6.25 (2026-03-23)
 
 - Fix: resume popup repeatedly showing — auto-skip path now directly POSTs to server, avoiding setState race that cleared saved preferences
