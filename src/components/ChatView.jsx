@@ -39,9 +39,10 @@ function extractTeamSessions(requests) {
   const teams = [];
   let currentTeamIdx = -1; // 当前唯一打开的 team 在 teams[] 中的 index
 
-  // 查找 TeamDelete 对应的 tool_result（在下一个 request 的 messages 中）
+  // 查找 tool_use 对应的 tool_result（在后续 request 的 messages 中）
+  // 搜索窗口扩大到 10 以应对空行/非主agent请求插入导致的距离增大
   function findToolResult(toolUseId, fromRequestIdx) {
-    for (let j = fromRequestIdx + 1; j < requests.length && j <= fromRequestIdx + 3; j++) {
+    for (let j = fromRequestIdx + 1; j < requests.length && j <= fromRequestIdx + 10; j++) {
       const msgs = requests[j]?.body?.messages;
       if (!Array.isArray(msgs)) continue;
       for (const msg of msgs) {
@@ -76,9 +77,15 @@ function extractTeamSessions(requests) {
       if (name === 'TeamCreate') {
         // 检查 TeamCreate 是否成功（tool_result 中不能有错误标记）
         const createResult = findToolResult(block.id, i);
-        if (createResult && (createResult.includes('"error"') || createResult.includes('Already leading team'))) continue;
+        if (createResult && (createResult.includes('"error":') || createResult.includes('"error" :') || createResult.includes('Already leading team'))) continue;
         const teamName = input.team_name || input.teamName || 'unknown';
         const ts = req.timestamp || req.response?.timestamp;
+        // 新 TeamCreate 出现时，自动关闭前一个未关闭的 team（避免孤立）
+        if (currentTeamIdx >= 0 && !teams[currentTeamIdx].endTime) {
+          teams[currentTeamIdx].endTime = ts;
+          teams[currentTeamIdx].endRequestIndex = Math.max(teams[currentTeamIdx].requestIndex, i - 1);
+          teams[currentTeamIdx]._inferredEnd = true;
+        }
         const team = { name: teamName, startTime: ts, endTime: null, requestIndex: i, endRequestIndex: null, taskCount: 0, teammateCount: 0, _teammates: new Set() };
         teams.push(team);
         currentTeamIdx = teams.length - 1;
@@ -90,6 +97,13 @@ function extractTeamSessions(requests) {
         teams[currentTeamIdx].endTime = ts;
         teams[currentTeamIdx].endRequestIndex = i;
         currentTeamIdx = -1; // 清理：team 已关闭
+      } else if (name === 'SendMessage') {
+        // 跟踪 shutdown_request 作为备用结束信号
+        if (currentTeamIdx >= 0 && input.message?.type === 'shutdown_request') {
+          const shutdownTs = req.timestamp || req.response?.timestamp;
+          teams[currentTeamIdx]._lastShutdownTime = shutdownTs;
+          teams[currentTeamIdx]._lastShutdownRequestIdx = i;
+        }
       } else if (name === 'TaskCreate' || name === 'TaskUpdate') {
         if (currentTeamIdx >= 0) teams[currentTeamIdx].taskCount++;
       } else if (name === 'Agent') {
@@ -97,8 +111,10 @@ function extractTeamSessions(requests) {
         const agentName = input.name || '';
         let targetIdx = -1;
         if (teamName) {
-          // 按 team_name 精确匹配
-          targetIdx = teams.findIndex(t => t.name === teamName && !t.endTime);
+          // 按 team_name 精确匹配（使用反向搜索，优先匹配最近的同名 team）
+          for (let ti = teams.length - 1; ti >= 0; ti--) {
+            if (teams[ti].name === teamName && !teams[ti].endTime) { targetIdx = ti; break; }
+          }
         }
         // fallback：如果没有 team_name 但有唯一打开的 team
         if (targetIdx < 0 && currentTeamIdx >= 0) targetIdx = currentTeamIdx;
@@ -106,6 +122,24 @@ function extractTeamSessions(requests) {
           const t = teams[targetIdx];
           if (!t._teammates.has(agentName)) { t._teammates.add(agentName); t.teammateCount++; }
         }
+      }
+    }
+  }
+  // 后处理：为未关闭的 team 推断 endTime
+  for (const team of teams) {
+    if (team.endTime) continue;
+    // 优先使用 shutdown_request 时间戳，其次使用最后一条请求的时间戳
+    if (team._lastShutdownTime) {
+      team.endTime = team._lastShutdownTime;
+      team.endRequestIndex = team._lastShutdownRequestIdx;
+      team._inferredEnd = true;
+    } else {
+      const lastReq = requests[requests.length - 1];
+      const lastTs = lastReq?.response?.timestamp || lastReq?.timestamp;
+      if (lastTs && team.startTime !== lastTs) {
+        team.endTime = lastTs;
+        team.endRequestIndex = requests.length - 1;
+        team._inferredEnd = true;
       }
     }
   }
@@ -1774,8 +1808,8 @@ class ChatView extends React.Component {
         <div className={styles.teamPopoverTitle}>{t('ui.teamSessions')} ({teamSessions.length})</div>
         {teamSessions.map((team, i) => {
           const time = team.startTime ? new Date(team.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-          const status = team.endTime ? '✓' : '●';
-          const statusColor = team.endTime ? '#52c41a' : '#faad14';
+          const status = team.endTime ? (team._inferredEnd ? '⏱' : '✓') : '●';
+          const statusColor = team.endTime ? (team._inferredEnd ? '#888' : '#52c41a') : '#faad14';
           return (
             <div key={i} className={styles.teamPopoverItem} onClick={() => this.setState({ teamModalSession: team })}>
               <span className={styles.teamPopoverStatus} style={{ color: statusColor }}>{status}</span>
@@ -1787,7 +1821,7 @@ class ChatView extends React.Component {
         })}
       </div>
     );
-    const hasActiveTeam = teamSessions.some(s => !s.endTime);
+    const hasActiveTeam = teamSessions.some(s => !s.endTime || s._inferredEnd);
     return (
       <Popover content={content} trigger="hover" placement="rightTop" overlayInnerStyle={{ background: '#1e1e1e', border: '1px solid #333', padding: 0 }}>
         <button className={`${styles.navBtn} ${styles.teamBtnRelative}`} title={t('ui.teamSessions')}>
@@ -2371,8 +2405,8 @@ class ChatView extends React.Component {
                 <div className={styles.teamAgentName}>team-lead</div>
               </div>
               <div className={styles.teamAgentType}>orchestrator</div>
-              <div className={styles.teamAgentStatus} style={{ color: team.endTime ? '#52c41a' : '#faad14' }}>
-                {team.endTime ? '✓ done' : '● active'}
+              <div className={styles.teamAgentStatus} style={{ color: team.endTime ? (team._inferredEnd ? '#888' : '#52c41a') : '#faad14' }}>
+                {team.endTime ? (team._inferredEnd ? '⏱ ended' : '✓ done') : '● active'}
               </div>
             </div>
             {teamAgents.map((ag, i) => {
