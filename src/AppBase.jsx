@@ -1,0 +1,1247 @@
+import React from 'react';
+import { ConfigProvider, theme, Modal, Table, Tag, Spin, Button, Checkbox, Popover, message } from 'antd';
+import { DownloadOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import { isMobile } from './env';
+import WorkspaceList from './components/WorkspaceList';
+import OpenFolderIcon from './components/OpenFolderIcon';
+import { t, getLang, setLang } from './i18n';
+import { formatTokenCount, filterRelevantRequests, appendCacheLossMap, extractCachedContent } from './utils/helpers';
+import { isMainAgent } from './utils/contentFilter';
+import { apiUrl } from './utils/apiUrl';
+import { saveEntries, loadEntries, clearEntries, getCacheMeta } from './utils/entryCache';
+import { reconstructEntries } from '../lib/delta-reconstructor.js';
+import { createEntrySlimmer, createIncrementalSlimmer } from './utils/entry-slim.js';
+import styles from './App.module.css';
+
+export { styles };
+
+export const MAX_SESSIONS = isMobile ? 30 : 100;
+
+/**
+ * 共享基类：包含 PC 和 Mobile 通用的状态管理、SSE 通信、数据处理、偏好设置等逻辑。
+ * 子类 App (PC) 和 Mobile 各自实现 render() 方法。
+ */
+class AppBase extends React.Component {
+  constructor(props) {
+    super(props);
+    // 从 localStorage 恢复缓存倒计时
+    const savedExpireAt = parseInt(localStorage.getItem('ccv_cacheExpireAt'), 10) || null;
+    const savedCacheType = localStorage.getItem('ccv_cacheType') || null;
+    // 只恢复尚未过期的缓存
+    const now = Date.now();
+    const cacheExpireAt = savedExpireAt && savedExpireAt > now ? savedExpireAt : null;
+    const cacheType = cacheExpireAt ? savedCacheType : null;
+    this.state = {
+      requests: [],
+      selectedIndex: null,
+      viewMode: 'raw',
+      cacheExpireAt,
+      cacheType,
+      mainAgentSessions: [], // [{ messages, response }]
+      importModalVisible: false,
+      localLogs: {},       // { projectName: [{file, timestamp, size}] }
+      localLogsLoading: false,
+      refreshingStats: false,
+      showAll: false,
+      lang: getLang(),
+      userProfile: null,    // { name, avatar }
+      projectName: '',      // 当前监控的项目名称
+      resumeModalVisible: false,
+      resumeFileName: '',
+      resumeRememberChoice: false,
+      resumeAutoChoice: null, // null | "continue" | "new"
+      collapseToolResults: true,
+      expandThinking: true,
+      expandDiff: false,
+      showThinkingSummaries: false,
+      fileLoading: false,
+      fileLoadingCount: 0,
+      isDragging: false,
+      selectedLogs: new Set(),   // Set<file>
+      githubStars: null,
+      cliMode: false,
+      workspaceMode: false,
+      serverCachedContent: null,
+      updateInfo: null,
+      pendingUploadPaths: [],
+      contextWindow: null,
+    };
+    this.eventSource = null;
+    this._autoSelectTimer = null;
+    this._chunkedEntries = [];   // 分段加载缓冲
+    this._chunkedTotal = 0;
+    this.mainContainerRef = React.createRef();
+    this._layoutRef = React.createRef();
+    // P0 perf: O(1) request dedup index
+    this._requestIndexMap = new Map();
+    // P0 perf: rAF batching for SSE messages
+    this._pendingEntries = [];
+    this._flushRafId = null;
+    // P0 perf: pre-computed cache loss map
+    this._cacheLossMap = new Map();
+    this._cacheLossProcessedCount = 0;
+    this._cacheLossLastMainAgent = null;
+    this._cacheLossShowAll = undefined;
+    // 增量维护的 KV-Cache 缓存内容（稳定引用，不受 inProgress 闪烁影响）
+    this._lastKvCacheContent = null;
+    // P0 perf: 实时 SSE 增量剪枝（默认关闭，localStorage ccv_sseSlim=true 启用）
+    this._sseSlimEnabled = !isMobile && localStorage.getItem('ccv_sseSlim') === 'true';
+    this._sseSlimmer = null;
+  }
+
+  /** Rebuild the O(1) request dedup index from a full entries array. */
+  _rebuildRequestIndex(entries) {
+    this._requestIndexMap.clear();
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
+      this._requestIndexMap.set(`${e.timestamp}|${e.url}`, i);
+    }
+    // Reset incremental cache loss state — next render will do a full pass
+    this._cacheLossProcessedCount = 0;
+    this._cacheLossLastMainAgent = null;
+    this._cacheLossMap = new Map();
+    this._lastKvCacheContent = null;
+    this._sseSlimmer = null;
+  }
+
+  componentDidMount() {
+    // 获取 claude settings（showThinkingSummaries 等）
+    fetch(apiUrl('/api/claude-settings')).then(r => r.json()).then(data => {
+      if (data.showThinkingSummaries) this.setState({ showThinkingSummaries: true });
+    }).catch(() => {});
+
+    // 获取用户偏好设置（包含 filterIrrelevant）
+    // 用 Promise 保存，供 initSSE 等待（resume_prompt 需要知道 resumeAutoChoice）
+    this._prefsReady = fetch(apiUrl('/api/preferences'))
+      .then(res => res.json())
+      .then(data => {
+        if (data.lang) {
+          setLang(data.lang);
+          this.setState({ lang: data.lang });
+        }
+        if (data.collapseToolResults !== undefined) {
+          this.setState({ collapseToolResults: !!data.collapseToolResults });
+        }
+        if (data.expandThinking !== undefined) {
+          this.setState({ expandThinking: !!data.expandThinking });
+        }
+        if (data.expandDiff !== undefined) {
+          this.setState({ expandDiff: !!data.expandDiff });
+        }
+        if (data.resumeAutoChoice) {
+          this.setState({ resumeAutoChoice: data.resumeAutoChoice });
+        }
+        // filterIrrelevant 默认 true，showAll = !filterIrrelevant
+        const filterIrrelevant = data.filterIrrelevant !== undefined ? !!data.filterIrrelevant : true;
+        this.setState({ showAll: !filterIrrelevant });
+        return data;
+      })
+      .catch(() => ({}));
+
+    // 获取系统用户头像和名字
+    fetch(apiUrl('/api/user-profile'))
+      .then(res => res.json())
+      .then(data => this.setState({ userProfile: data }))
+      .catch(() => { });
+
+    // 获取当前监控的项目名称
+    const params = new URLSearchParams(window.location.search);
+    const logfile = params.get('logfile');
+    fetch(apiUrl('/api/project-name'))
+      .then(res => res.json())
+      .then(data => {
+        const projectName = data.projectName || '';
+        this.setState({ projectName });
+        // 移动端：从缓存恢复数据，在 SSE 数据到达前立即渲染
+        if (isMobile && projectName && !logfile && this.state.requests.length === 0) {
+          loadEntries(projectName).then(cached => {
+            if (cached && this.state.requests.length === 0) {
+              this.assignMessageTimestamps(cached);
+              const mainAgentSessions = this.buildSessionsFromEntries(cached);
+              const filtered = filterRelevantRequests(cached);
+              this._rebuildRequestIndex(cached);
+              this.setState({
+                requests: cached,
+                selectedIndex: filtered.length > 0 ? filtered.length - 1 : null,
+                mainAgentSessions,
+                fileLoading: false,
+              });
+            }
+          });
+        }
+      })
+      .catch(() => { });
+
+    // 获取 GitHub star 数
+    fetch('https://api.github.com/repos/weiesky/cc-viewer')
+      .then(res => res.json())
+      .then(data => { if (data.stargazers_count != null) this.setState({ githubStars: data.stargazers_count }); })
+      .catch(() => { });
+
+    // 检测 CLI 模式 / 工作区模式
+    fetch(apiUrl('/api/cli-mode'))
+      .then(res => res.json())
+      .then(data => {
+        if (data.workspaceMode) {
+          this.setState({ cliMode: true, workspaceMode: true, isWorkspaceServer: true });
+        } else if (data.cliMode) {
+          this.setState({ cliMode: true, viewMode: 'chat' });
+        }
+      })
+      .catch(() => { });
+
+    // 检查是否是通过 ?logfile= 打开的历史日志
+    if (logfile) {
+      this.loadLocalLogFile(logfile);
+    } else {
+      this.initSSE();
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.eventSource) this.eventSource.close();
+    if (this._localLogES) { this._localLogES.close(); this._localLogES = null; }
+    if (this._autoSelectTimer) clearTimeout(this._autoSelectTimer);
+    if (this._loadingCountTimer) cancelAnimationFrame(this._loadingCountTimer);
+    if (this._cacheSaveTimer) clearTimeout(this._cacheSaveTimer);
+    if (this._sseTimeoutTimer) clearTimeout(this._sseTimeoutTimer);
+    if (this._sseReconnectTimer) clearTimeout(this._sseReconnectTimer);
+  }
+
+  // ─── SSE 通信 ───────────────────────────────────────────
+
+  // SSE 心跳超时检测：45s 内无任何事件则判定连接断开
+  _resetSSETimeout = () => {
+    if (this._sseTimeoutTimer) clearTimeout(this._sseTimeoutTimer);
+    this._sseReconnectCount = 0; // 收到事件说明连接正常，重置重连计数
+    this._sseTimeoutTimer = setTimeout(() => {
+      console.warn('SSE heartbeat timeout, reconnecting...');
+      this._reconnectSSE();
+    }, 45000);
+  };
+
+  _reconnectSSE() {
+    if (this._sseReconnectCount >= 10) {
+      console.error('SSE reconnect limit reached');
+      return;
+    }
+    this._sseReconnectCount = (this._sseReconnectCount || 0) + 1;
+    if (this.eventSource) { this.eventSource.close(); this.eventSource = null; }
+    if (this._flushRafId) { cancelAnimationFrame(this._flushRafId); this._flushRafId = null; }
+    this._pendingEntries = [];
+    this._sseSlimmer = null;
+    if (this._sseReconnectTimer) clearTimeout(this._sseReconnectTimer);
+    this._sseReconnectTimer = setTimeout(() => { this.initSSE(); }, 2000);
+  }
+
+  animateLoadingCount(target, onDone) {
+    if (this._loadingCountTimer) {
+      cancelAnimationFrame(this._loadingCountTimer);
+      this._loadingCountTimer = null;
+    }
+    const duration = Math.min(800, Math.max(300, target * 0.5));
+    const start = performance.now();
+    const step = (now) => {
+      const progress = Math.min((now - start) / duration, 1);
+      const current = Math.round(progress * target);
+      this.setState({ fileLoadingCount: current });
+      if (progress < 1) {
+        this._loadingCountTimer = requestAnimationFrame(step);
+      } else {
+        this._loadingCountTimer = null;
+        onDone();
+      }
+    };
+    this._loadingCountTimer = requestAnimationFrame(step);
+  }
+
+  initSSE() {
+    try {
+      // 尝试使用缓存元数据进行增量加载
+      let url = '/events';
+      let hasCache = false;
+      if (isMobile) {
+        const meta = getCacheMeta();
+        if (meta && meta.lastTs && meta.count > 0) {
+          url = `/events?since=${encodeURIComponent(meta.lastTs)}&cc=${meta.count}`;
+          hasCache = true;
+        }
+      }
+      // 只有在无缓存时才显示 loading 遮罩
+      if (!hasCache) {
+        this.setState({ fileLoading: true, fileLoadingCount: 0 });
+      }
+      this.eventSource = new EventSource(apiUrl(url));
+      // 每次收到任何 SSE 事件（包括心跳注释帧触发的隐式活动）都重置超时
+      this.eventSource.onmessage = (event) => { this._resetSSETimeout(); this.handleEventMessage(event); };
+      this.eventSource.onopen = () => { this._resetSSETimeout(); };
+      this.eventSource.addEventListener('resume_prompt', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          // 等待偏好加载完成再判断是否跳过弹窗（避免竞态）
+          (this._prefsReady || Promise.resolve({})).then((prefs) => {
+            if (prefs?.resumeAutoChoice) {
+              // 自动跳过：直接发送选择到服务端，不触碰偏好设置（避免 setState 竞态清除偏好）
+              fetch(apiUrl('/api/resume-choice'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ choice: prefs.resumeAutoChoice }),
+              }).catch(err => console.error('resume-choice failed:', err));
+            } else {
+              this.setState({ resumeModalVisible: true, resumeFileName: data.recentFileName || '' });
+            }
+          });
+        } catch { }
+      });
+      this.eventSource.addEventListener('resume_resolved', () => {
+        this.setState({ resumeModalVisible: false, resumeFileName: '', resumeRememberChoice: false });
+      });
+      this.eventSource.addEventListener('update_completed', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          this.setState({ updateInfo: { type: 'completed', version: data.version } });
+        } catch { }
+      });
+      this.eventSource.addEventListener('update_major_available', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          this.setState({ updateInfo: { type: 'major', version: data.version } });
+        } catch { }
+      });
+      this.eventSource.addEventListener('load_start', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          this._chunkedEntries = [];
+          this._chunkedTotal = data.total || 0;
+          this._isIncremental = !!data.incremental;
+          // 增量模式下已有缓存数据在显示，不需要 loading 遮罩
+          if (!this._isIncremental) {
+            this.setState({ fileLoading: true, fileLoadingCount: 0 });
+          }
+        } catch { }
+      });
+      this.eventSource.addEventListener('load_chunk', (event) => {
+        try {
+          const chunk = JSON.parse(event.data);
+          if (Array.isArray(chunk)) {
+            this._chunkedEntries.push(...chunk);
+            // 增量模式下静默累积，不更新 loading 计数
+            if (!this._isIncremental) {
+              this.setState({ fileLoadingCount: this._chunkedEntries.length });
+            }
+          }
+        } catch { }
+      });
+      this.eventSource.addEventListener('load_end', () => {
+        const delta = this._chunkedEntries;
+        this._chunkedEntries = [];
+        this._chunkedTotal = 0;
+        const isIncremental = this._isIncremental;
+        this._isIncremental = false;
+
+        // 增量模式：将增量数据拼接到已有缓存后面
+        const rawEntries = (isIncremental && isMobile && this.state.requests.length > 0)
+          ? [...this.state.requests, ...delta]
+          : delta;
+
+        // Delta 重建：server 发送原始 delta 条目，客户端重建为完整 messages
+        const entries = Array.isArray(rawEntries) ? reconstructEntries(rawEntries) : rawEntries;
+
+        if (Array.isArray(entries) && entries.length > 0) {
+          this.assignMessageTimestamps(entries);
+          const mainAgentSessions = this.buildSessionsFromEntries(entries);
+          const filtered = filterRelevantRequests(entries);
+          this._rebuildRequestIndex(entries);
+          this.setState({
+            requests: entries,
+            selectedIndex: filtered.length > 0 ? filtered.length - 1 : null,
+            mainAgentSessions,
+            fileLoading: false,
+            fileLoadingCount: 0,
+          });
+          if (isMobile && this.state.projectName) {
+            saveEntries(this.state.projectName, entries);
+          }
+        } else {
+          this.setState({ fileLoading: false, fileLoadingCount: 0 });
+        }
+      });
+      this.eventSource.addEventListener('full_reload', (event) => {
+        try {
+          const entries = JSON.parse(event.data);
+          if (Array.isArray(entries)) {
+            this.assignMessageTimestamps(entries);
+            const mainAgentSessions = this.buildSessionsFromEntries(entries);
+            const filtered = filterRelevantRequests(entries);
+            this._rebuildRequestIndex(entries);
+            if (entries.length > 0) {
+              this.animateLoadingCount(entries.length, () => {
+                this.setState({
+                  requests: entries,
+                  selectedIndex: filtered.length > 0 ? filtered.length - 1 : null,
+                  mainAgentSessions,
+                  fileLoading: false,
+                  fileLoadingCount: 0,
+                  serverCachedContent: null,
+                });
+                if (isMobile && this.state.projectName) {
+                  saveEntries(this.state.projectName, entries);
+                }
+              });
+            } else {
+              this.setState({
+                requests: entries,
+                selectedIndex: null,
+                mainAgentSessions,
+                fileLoading: false,
+                fileLoadingCount: 0,
+                serverCachedContent: null,
+              });
+              if (isMobile) clearEntries();
+            }
+          } else {
+            this.setState({ fileLoading: false, fileLoadingCount: 0 });
+          }
+        } catch {
+          this.setState({ fileLoading: false, fileLoadingCount: 0 });
+        }
+      });
+      // 工作区模式事件
+      this.eventSource.addEventListener('workspace_started', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          // 取消旧动画，防止旧 full_reload 回调覆盖新数据
+          if (this._loadingCountTimer) {
+            cancelAnimationFrame(this._loadingCountTimer);
+            this._loadingCountTimer = null;
+          }
+          this._rebuildRequestIndex([]);
+          this.setState({
+            workspaceMode: false,
+            projectName: data.projectName || '',
+            viewMode: 'chat',
+            cliMode: true,
+            requests: [],
+            mainAgentSessions: [],
+            selectedIndex: null,
+          });
+          if (isMobile) clearEntries();
+        } catch {}
+      });
+      this.eventSource.addEventListener('workspace_stopped', () => {
+        this._rebuildRequestIndex([]);
+        this.setState({
+          workspaceMode: true,
+          requests: [],
+          mainAgentSessions: [],
+          projectName: '',
+          selectedIndex: null,
+        });
+      });
+      this.eventSource.addEventListener('context_window', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          this.setState({ contextWindow: data });
+        } catch { }
+      });
+      this.eventSource.addEventListener('kv_cache_content', (event) => {
+        try {
+          const cached = JSON.parse(event.data);
+          // 防御：忽略无实际内容的 kv_cache_content（避免空数据覆盖有效缓存）
+          if (cached && (cached.system?.length > 0 || cached.messages?.length > 0 || cached.tools?.length > 0)) {
+            this.setState({ serverCachedContent: cached });
+          }
+        } catch (err) {
+          console.error('Failed to parse kv_cache_content:', err);
+        }
+      });
+      this.eventSource.addEventListener('ping', () => { this._resetSSETimeout(); });
+      this.eventSource.onerror = () => console.error('SSE连接错误');
+    } catch (error) {
+      console.error('EventSource初始化失败:', error);
+      this.setState({ fileLoading: false, fileLoadingCount: 0 });
+    }
+  }
+
+  loadLocalLogFile(file) {
+    // 独立 SSE 链路加载历史日志：/api/local-log 返回 event-stream，
+    // 与 /events (CLI 模式) 完全隔离，不会触发 terminal/workspace 等 CLI 行为
+    this._isLocalLog = true;
+    this._localLogFile = file;
+    this.setState({ fileLoading: true, fileLoadingCount: 0, serverCachedContent: null });
+
+    // 关闭上一次的加载连接（防止快速切换时资源泄漏）
+    if (this._localLogES) { this._localLogES.close(); this._localLogES = null; }
+
+    const entries = [];
+    const slimmer = createEntrySlimmer(isMainAgent);
+    const es = new EventSource(apiUrl(`/api/local-log?file=${encodeURIComponent(file)}`));
+    this._localLogES = es;
+
+    es.addEventListener('load_start', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        this.setState({ fileLoadingCount: 0 });
+      } catch { }
+    });
+
+    es.addEventListener('load_chunk', (event) => {
+      try {
+        const chunk = JSON.parse(event.data);
+        if (Array.isArray(chunk)) {
+          for (const entry of chunk) {
+            slimmer.process(entry, entries, entries.length);
+            entries.push(entry);
+          }
+          this.setState({ fileLoadingCount: entries.length });
+        }
+      } catch { }
+    });
+
+    es.addEventListener('load_end', () => {
+      es.close();
+      slimmer.finalize(entries);
+      // Delta 重建：server 发送原始 delta 条目，客户端重建为完整 messages
+      const reconstructed = reconstructEntries(entries);
+      if (Array.isArray(reconstructed) && reconstructed.length > 0) {
+        this.assignMessageTimestamps(reconstructed);
+        const mainAgentSessions = this.buildSessionsFromEntries(reconstructed);
+        const filtered = filterRelevantRequests(reconstructed);
+        this._rebuildRequestIndex(reconstructed);
+        this.setState({
+          requests: reconstructed,
+          selectedIndex: filtered.length > 0 ? filtered.length - 1 : null,
+          mainAgentSessions,
+          fileLoading: false,
+          fileLoadingCount: 0,
+          serverCachedContent: null,
+        });
+      } else {
+        this.setState({ fileLoading: false, fileLoadingCount: 0, serverCachedContent: null });
+      }
+    });
+
+    es.onerror = () => {
+      es.close();
+      console.error('加载日志文件 SSE 连接错误');
+      this.setState({ fileLoading: false, fileLoadingCount: 0 });
+    };
+  }
+
+  handleEventMessage(event) {
+    try {
+      const entry = JSON.parse(event.data);
+      this._pendingEntries.push(entry);
+      if (!this._flushRafId) {
+        this._flushRafId = requestAnimationFrame(this._flushPendingEntries);
+      }
+    } catch (error) {
+      console.error('处理事件消息失败:', error);
+    }
+  }
+
+  _flushPendingEntries = () => {
+    this._flushRafId = null;
+    const batch = this._pendingEntries;
+    this._pendingEntries = [];
+    if (batch.length === 0) return;
+
+    this.setState(prev => {
+      const requests = [...prev.requests]; // one copy per frame, not per message
+
+      let cacheExpireAt = prev.cacheExpireAt;
+      let cacheType = prev.cacheType;
+      let mainAgentSessions = prev.mainAgentSessions;
+
+      // P0 perf: lazy init 增量剪枝器
+      if (this._sseSlimEnabled && !this._sseSlimmer) {
+        this._sseSlimmer = createIncrementalSlimmer(isMainAgent);
+      }
+
+      for (const entry of batch) {
+        const key = `${entry.timestamp}|${entry.url}`;
+        const existingIndex = this._requestIndexMap.get(key);
+
+        if (existingIndex !== undefined) {
+          requests[existingIndex] = entry;
+          if (this._sseSlimmer) this._sseSlimmer.onDedup(existingIndex);
+        } else {
+          const newIdx = requests.length;
+          if (this._sseSlimmer) this._sseSlimmer.processEntry(entry, requests, newIdx);
+          this._requestIndexMap.set(key, newIdx);
+          requests.push(entry);
+        }
+
+        // 增量维护 KV-Cache 缓存内容：只在 completed MainAgent（有 usage）时更新，避免 inProgress 闪烁
+        if (isMainAgent(entry) && !entry.inProgress && entry.response?.body?.usage) {
+          const kvCached = extractCachedContent([entry]);
+          if (kvCached && (kvCached.system.length > 0 || kvCached.messages.length > 0 || kvCached.tools.length > 0)) {
+            this._lastKvCacheContent = kvCached;
+          }
+        }
+
+        // 记录 mainAgent 缓存信息
+        if (isMainAgent(entry)) {
+          const usage = entry.response?.body?.usage;
+          if (usage?.cache_creation) {
+            const cc = usage.cache_creation;
+            const reqTime = entry.timestamp ? new Date(entry.timestamp).getTime() : Date.now();
+            let newExpireAt = null;
+            let newType = null;
+            if (cc.ephemeral_1h_input_tokens > 0) {
+              newExpireAt = reqTime + 3600 * 1000;
+              newType = '1h';
+            } else if (cc.ephemeral_5m_input_tokens > 0) {
+              newExpireAt = reqTime + 5 * 60 * 1000;
+              newType = '5m';
+            }
+            if (newExpireAt && newExpireAt > Date.now()) {
+              cacheExpireAt = newExpireAt;
+              const cacheTotal = (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0);
+              cacheType = cacheTotal > 0 ? formatTokenCount(cacheTotal) : newType;
+              localStorage.setItem('ccv_cacheExpireAt', String(cacheExpireAt));
+              localStorage.setItem('ccv_cacheType', cacheType);
+            }
+          }
+        }
+
+        // 合并 mainAgent sessions（跳过被剪枝的 entry，其 messages 已被清空）
+        if (isMainAgent(entry) && entry.body && Array.isArray(entry.body.messages) && !entry._slimmed) {
+          const timestamp = entry.timestamp || new Date().toISOString();
+          const lastSession = mainAgentSessions.length > 0 ? mainAgentSessions[mainAgentSessions.length - 1] : null;
+          const prevMessages = lastSession?.messages || [];
+          const messages = entry.body.messages;
+          const prevCount = prevMessages.length;
+
+          const userId = entry.body.metadata?.user_id || null;
+          const sameUser = userId !== null && lastSession?.userId === userId;
+          const isNewSession = !sameUser && prevCount > 0 && messages.length < prevCount * 0.5 && (prevCount - messages.length) > 4;
+
+          const isTransient = prevCount > 4 && messages.length <= 4 && messages.length < prevCount * 0.5;
+          if (isTransient) continue;
+
+          for (let i = 0; i < messages.length; i++) {
+            if (!isNewSession && i < prevCount && prevMessages[i]._timestamp) {
+              messages[i]._timestamp = prevMessages[i]._timestamp;
+            } else if (!messages[i]._timestamp) {
+              messages[i]._timestamp = timestamp;
+            }
+          }
+          mainAgentSessions = this.mergeMainAgentSessions(mainAgentSessions, entry);
+        }
+      }
+
+      let selectedIndex = prev.selectedIndex;
+
+      if (mainAgentSessions.length > MAX_SESSIONS) {
+        mainAgentSessions = mainAgentSessions.slice(-MAX_SESSIONS);
+      }
+      if (selectedIndex === null && requests.length > 0) {
+        if (this._autoSelectTimer) clearTimeout(this._autoSelectTimer);
+        this._autoSelectTimer = setTimeout(() => {
+          this.setState(s => {
+            if (s.selectedIndex === null && s.requests.length > 0) {
+              const filtered = s.showAll ? s.requests : filterRelevantRequests(s.requests);
+              return filtered.length > 0 ? { selectedIndex: filtered.length - 1 } : null;
+            }
+            return null;
+          });
+        }, 200);
+      }
+
+      return { requests, cacheExpireAt, cacheType, mainAgentSessions };
+    }, () => {
+      // 移动端：防抖 5s 批量写入缓存
+      if (isMobile && this.state.projectName) {
+        if (this._cacheSaveTimer) clearTimeout(this._cacheSaveTimer);
+        this._cacheSaveTimer = setTimeout(() => {
+          if (this.state.projectName) saveEntries(this.state.projectName, this.state.requests);
+        }, 5000);
+      }
+    });
+  };
+
+  // ─── 数据处理 ───────────────────────────────────────────
+
+  assignMessageTimestamps(entries) {
+    let timestamps = [];
+    let prevUserId = null;
+    for (const entry of entries) {
+      if (!isMainAgent(entry) || !entry.body || !Array.isArray(entry.body.messages)) continue;
+      const messages = entry.body.messages;
+      const count = entry._messageCount || messages.length;
+      const userId = entry.body.metadata?.user_id || null;
+      const timestamp = entry.timestamp || new Date().toISOString();
+
+      const prevCount = timestamps.length;
+      const isNewSession = prevCount > 0 && (
+        (count < prevCount * 0.5 && (prevCount - count) > 4) ||
+        (prevUserId && userId && userId !== prevUserId)
+      );
+      if (isNewSession) {
+        timestamps = [];
+      }
+
+      for (let i = timestamps.length; i < count; i++) {
+        timestamps.push(timestamp);
+      }
+
+      if (messages.length > 0) {
+        for (let i = 0; i < messages.length; i++) {
+          messages[i]._timestamp = timestamps[i];
+        }
+      }
+      prevUserId = userId;
+    }
+  }
+
+  buildSessionsFromEntries(entries) {
+    let sessions = [];
+    for (const entry of entries) {
+      if (isMainAgent(entry) && entry.body && Array.isArray(entry.body.messages) && !entry._slimmed) {
+        sessions = this.mergeMainAgentSessions(sessions, entry);
+      }
+    }
+    return sessions;
+  }
+
+  mergeMainAgentSessions(prevSessions, entry) {
+    const newMessages = entry.body.messages;
+    const newResponse = entry.response;
+    const userId = entry.body.metadata?.user_id || null;
+
+    const entryTimestamp = entry.timestamp || null;
+
+    if (prevSessions.length === 0) {
+      return [{ userId, messages: newMessages, response: newResponse, entryTimestamp }];
+    }
+
+    const lastSession = prevSessions[prevSessions.length - 1];
+
+    const prevMsgCount = lastSession.messages ? lastSession.messages.length : 0;
+    const isNewConversation = prevMsgCount > 0 && newMessages.length < prevMsgCount * 0.5 && (prevMsgCount - newMessages.length) > 4;
+    const sameUser = userId !== null && userId === lastSession.userId;
+
+    if (isNewConversation && newMessages.length <= 4 && prevMsgCount > 4) {
+      return prevSessions;
+    }
+
+    if (sameUser || (userId === lastSession.userId && !isNewConversation)) {
+      const updated = [...prevSessions];
+      updated[updated.length - 1] = { userId, messages: newMessages, response: newResponse, entryTimestamp };
+      return updated;
+    } else {
+      return [...prevSessions, { userId, messages: newMessages, response: newResponse, entryTimestamp }];
+    }
+  }
+
+  // ─── 选中 & 导航 ───────────────────────────────────────
+
+  handleSelectRequest = (index) => {
+    this.setState({ selectedIndex: index, scrollCenter: false });
+  };
+
+  handleScrollDone = () => { this.setState({ scrollCenter: false }); };
+  handleScrollTsDone = () => { this.setState({ chatScrollToTs: null }); };
+
+  // ─── 模式切换 ──────────────────────────────────────────
+
+  handleWorkspaceLaunch = ({ projectName }) => {
+    this._isLocalLog = false;
+    this._localLogFile = null;
+    this.setState({
+      workspaceMode: false,
+      projectName,
+      viewMode: 'chat',
+      cliMode: true,
+    });
+  };
+
+  handleReturnToWorkspaces = () => {
+    fetch(apiUrl('/api/workspaces/stop'), { method: 'POST' })
+      .then(() => {
+        this._rebuildRequestIndex([]);
+        this.setState({
+          workspaceMode: true,
+          requests: [],
+          mainAgentSessions: [],
+          projectName: '',
+          selectedIndex: null,
+        });
+      })
+      .catch(() => {});
+  };
+
+  // ─── 偏好设置 ──────────────────────────────────────────
+
+  handleLangChange = () => {
+    const lang = getLang();
+    this.setState({ lang });
+    fetch(apiUrl('/api/preferences'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lang }),
+    }).catch(() => { });
+  };
+
+  handleCollapseToolResultsChange = (checked) => {
+    this.setState({ collapseToolResults: checked });
+    fetch(apiUrl('/api/preferences'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ collapseToolResults: checked }),
+    }).catch(() => { });
+  };
+
+  handleExpandThinkingChange = (checked) => {
+    this.setState({ expandThinking: checked });
+    fetch(apiUrl('/api/preferences'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expandThinking: checked }),
+    }).catch(() => { });
+  };
+
+  handleExpandDiffChange = (checked) => {
+    this.setState({ expandDiff: checked });
+    fetch(apiUrl('/api/preferences'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expandDiff: checked }),
+    }).catch(() => { });
+  };
+
+  handleFilterIrrelevantChange = (checked) => {
+    this.setState(prev => {
+      const newShowAll = !checked;
+      const newFiltered = newShowAll ? prev.requests : filterRelevantRequests(prev.requests);
+      return {
+        showAll: newShowAll,
+        selectedIndex: newFiltered.length > 0 ? newFiltered.length - 1 : null,
+      };
+    });
+    fetch(apiUrl('/api/preferences'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filterIrrelevant: checked }),
+    }).catch(() => { });
+  };
+
+  // ─── 日志管理 ──────────────────────────────────────────
+
+  handleImportLocalLogs = () => {
+    this.setState({ importModalVisible: true, localLogsLoading: true });
+    fetch(apiUrl('/api/local-logs'))
+      .then(res => res.json())
+      .then(data => {
+        const { _currentProject, ...logs } = data;
+        this.setState({ localLogs: logs, currentProject: _currentProject || '', localLogsLoading: false });
+      })
+      .catch(() => {
+        this.setState({ localLogs: {}, localLogsLoading: false });
+      });
+  };
+
+  handleCloseImportModal = () => {
+    this.setState({ importModalVisible: false, selectedLogs: new Set() });
+  };
+
+  handleRefreshStats = () => {
+    this.setState({ refreshingStats: true });
+    fetch(apiUrl('/api/refresh-stats'), { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (!data.ok) throw new Error(data.error || 'refresh failed');
+        return fetch(apiUrl('/api/local-logs'));
+      })
+      .then(res => res.json())
+      .then(data => {
+        const { _currentProject, ...logs } = data;
+        this.setState({ localLogs: logs, refreshingStats: false });
+        message.success(t('ui.refreshStatsSuccess'));
+      })
+      .catch(() => {
+        this.setState({ refreshingStats: false });
+        message.error(t('ui.refreshStatsFailed'));
+      });
+  };
+
+  renderLogTable(logs, mobile) {
+    const columns = [
+      {
+        title: '',
+        dataIndex: 'file',
+        key: 'check',
+        width: 40,
+        fixed: mobile ? 'left' : false,
+        render: (file) => (
+          <Checkbox
+            checked={this.state.selectedLogs.has(file) || false}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => { e.stopPropagation(); this.handleToggleLogSelect(file, e.target.checked); }}
+          />
+        ),
+      },
+      {
+        title: t('ui.logTime'),
+        dataIndex: 'timestamp',
+        key: 'time',
+        width: mobile ? 150 : 180,
+        render: (ts) => <span className={styles.tableTimestampCell}>{this.formatTimestamp(ts, mobile)}</span>,
+      },
+      {
+        title: t('ui.logPreview'),
+        dataIndex: 'preview',
+        key: 'preview',
+        width: mobile ? 150 : undefined,
+        ellipsis: true,
+        render: (arr) => {
+          if (!Array.isArray(arr) || arr.length === 0) return '—';
+          const first = arr[0];
+          const displayText = (first.length <= 30 && arr.length > 1) ? `${first} | ${arr[1]}` : first;
+          if (arr.length <= 1) return <span className={styles.tablePreviewText}>{displayText}</span>;
+          return (
+            <Popover
+              trigger={mobile ? 'click' : 'hover'}
+              placement={mobile ? 'bottomLeft' : 'leftTop'}
+              autoAdjustOverflow={{ adjustX: false, adjustY: true }}
+              overlayInnerStyle={{
+                background: '#1e1e1e',
+                border: '1px solid #3a3a3a',
+                borderRadius: 8,
+                padding: 0,
+                maxHeight: 400,
+                overflowY: 'auto',
+              }}
+              content={
+                <div className={styles.previewPopover}>
+                  {arr.map((text, i) => (
+                    <div key={i} className={styles.previewItem}>
+                      <pre className={styles.previewText}>{text}</pre>
+                    </div>
+                  ))}
+                </div>
+              }
+            >
+              <span className={styles.tablePreviewTextClickable} style={{ textDecoration: mobile ? 'underline dotted #666' : 'none' }}>{displayText}</span>
+            </Popover>
+          );
+        },
+      },
+      ...(!mobile ? [{
+        title: t('ui.logTurns'),
+        dataIndex: 'turns',
+        key: 'turns',
+        width: 80,
+        render: (v) => <Tag className={styles.tableTag}>{v || 0}</Tag>,
+      }] : []),
+      {
+        title: t('ui.logSize'),
+        dataIndex: 'size',
+        key: 'size',
+        width: 90,
+        render: (v) => <Tag className={styles.tableTag}>{this.formatSize(v)}</Tag>,
+      },
+      {
+        title: t('ui.logActions'),
+        key: 'actions',
+        width: mobile ? 160 : 180,
+        render: (_, log) => (
+          <span className={styles.tableActionsCell}>
+            <Button size="small" type="primary" onClick={(e) => { e.stopPropagation(); this.handleOpenLogFile(log.file); }}>
+              {t('ui.openLog')}
+            </Button>
+            <Button size="small" icon={<DownloadOutlined />} onClick={(e) => { e.stopPropagation(); this.handleDownloadLogFile(log.file); }}>
+              {t('ui.downloadLog')}
+            </Button>
+          </span>
+        ),
+      },
+    ];
+
+    return (
+      <Table
+        size="small"
+        dataSource={logs}
+        columns={columns}
+        rowKey="file"
+        pagination={false}
+        scroll={mobile ? { x: 'max-content', y: 'calc(100vh - 160px)' } : { y: 400 }}
+        onRow={(log) => ({
+          onClick: () => {
+            const checked = !this.state.selectedLogs.has(log.file);
+            this.handleToggleLogSelect(log.file, checked);
+          },
+          style: { cursor: 'pointer' },
+        })}
+      />
+    );
+  }
+
+  handleToggleLogSelect = (file, checked) => {
+    this.setState(prev => {
+      const selectedLogs = new Set(prev.selectedLogs);
+      if (checked) selectedLogs.add(file);
+      else selectedLogs.delete(file);
+      return { selectedLogs };
+    });
+  };
+
+  handleMergeLogs = () => {
+    const { selectedLogs, localLogs, currentProject } = this.state;
+    if (selectedLogs.size < 2) return;
+
+    const logs = localLogs[currentProject];
+    if (!logs) return;
+
+    const indices = [];
+    logs.forEach((log, i) => {
+      if (selectedLogs.has(log.file)) indices.push(i);
+    });
+    indices.sort((a, b) => a - b);
+
+    if (selectedLogs.has(logs[0].file)) {
+      message.warning(t('ui.mergeLatestNotAllowed'));
+      return;
+    }
+
+    for (let i = 1; i < indices.length; i++) {
+      if (indices[i] - indices[i - 1] !== 1) {
+        message.warning(t('ui.mergeNotConsecutive'));
+        return;
+      }
+    }
+
+    const totalSize = indices.reduce((sum, i) => sum + logs[i].size, 0);
+    if (totalSize > 500 * 1024 * 1024) {
+      message.warning(t('ui.mergeTooLarge'));
+      return;
+    }
+
+    const files = indices.map(i => logs[i].file).reverse();
+
+    fetch(apiUrl('/api/merge-logs'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok) {
+          message.success(t('ui.mergeSuccess'));
+          this.setState({ selectedLogs: new Set() });
+          this.handleImportLocalLogs();
+        } else {
+          message.error(data.error || 'Merge failed');
+        }
+      })
+      .catch(() => message.error('Merge failed'));
+  };
+
+  handleDeleteLogs = () => {
+    const { selectedLogs } = this.state;
+    if (selectedLogs.size === 0) return;
+
+    Modal.confirm({
+      title: t('ui.deleteLogs'),
+      content: t('ui.deleteLogsConfirm', { count: selectedLogs.size }),
+      okText: t('ui.deleteLogs'),
+      okButtonProps: { danger: true },
+      cancelText: t('ui.cancel'),
+      onOk: () => {
+        const files = [...selectedLogs];
+        fetch(apiUrl('/api/delete-logs'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ files }),
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.results) {
+              const deleted = data.results.filter(r => r.ok).length;
+              const failed = data.results.filter(r => r.error).length;
+              if (deleted > 0) message.success(t('ui.deleteSuccess', { count: deleted }));
+              if (failed > 0) message.error(t('ui.deleteFailed', { count: failed }));
+              this.setState({ selectedLogs: new Set() });
+              this.handleImportLocalLogs();
+            }
+          })
+          .catch(() => message.error('Delete failed'));
+      },
+    });
+  };
+
+  handleOpenLogFile = (file) => {
+    const port = window.location.port || window.location.host.split(':')[1] || '7008';
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
+    window.open(`${window.location.protocol}//${window.location.hostname}:${port}?logfile=${encodeURIComponent(file)}${tokenParam}`, '_blank');
+    this.setState({ importModalVisible: false });
+  };
+
+  handleDownloadLogFile = (file) => {
+    const url = apiUrl(`/api/download-log?file=${encodeURIComponent(file)}`);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  // ─── 恢复会话 ──────────────────────────────────────────
+
+  handleResumeChoice = (choice) => {
+    if (this.state.resumeRememberChoice) {
+      this.setState({ resumeAutoChoice: choice });
+      fetch(apiUrl('/api/preferences'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resumeAutoChoice: choice }),
+      }).catch(() => {});
+    }
+    fetch(apiUrl('/api/resume-choice'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ choice }),
+    }).catch(err => console.error('resume-choice failed:', err));
+  };
+
+  handleResumeAutoChoiceToggle = (enabled) => {
+    const value = enabled ? 'continue' : null;
+    this.setState({ resumeAutoChoice: value });
+    fetch(apiUrl('/api/preferences'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resumeAutoChoice: value }),
+    }).catch(() => {});
+  };
+
+  handleResumeAutoChoiceChange = (value) => {
+    this.setState({ resumeAutoChoice: value });
+    fetch(apiUrl('/api/preferences'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resumeAutoChoice: value }),
+    }).catch(() => {});
+  };
+
+  _finishLocalLoad = (entries, fileNames) => {
+    if (entries.length === 0) {
+      message.error(t('ui.noLogs'));
+      this.setState({ fileLoading: false, fileLoadingCount: 0 });
+      return;
+    }
+    this.animateLoadingCount(entries.length, () => {
+      let mainAgentSessions = [];
+      for (const entry of entries) {
+        if (isMainAgent(entry) && entry.body && Array.isArray(entry.body.messages)) {
+          mainAgentSessions = this.mergeMainAgentSessions(mainAgentSessions, entry);
+        }
+      }
+      const filtered = filterRelevantRequests(entries);
+      this._isLocalLog = true;
+      this._localLogFile = fileNames.length === 1 ? fileNames[0] : `${fileNames.length} files`;
+      if (this.eventSource) { this.eventSource.close(); this.eventSource = null; }
+      this._rebuildRequestIndex(entries);
+      this.setState({
+        requests: entries,
+        selectedIndex: filtered.length > 0 ? filtered.length - 1 : null,
+        mainAgentSessions,
+        importModalVisible: false,
+        fileLoading: false,
+        fileLoadingCount: 0,
+      });
+    });
+  };
+
+  // ─── 格式化 ────────────────────────────────────────────
+
+  formatTimestamp(ts, mobile) {
+    if (!ts || ts.length < 15) return ts;
+    if (mobile) return `${ts.slice(4, 6)}-${ts.slice(6, 8)} ${ts.slice(9, 11)}:${ts.slice(11, 13)}:${ts.slice(13, 15)}`;
+    return `${ts.slice(0, 4)}-${ts.slice(4, 6)}-${ts.slice(6, 8)} ${ts.slice(9, 11)}:${ts.slice(11, 13)}:${ts.slice(13, 15)}`;
+  }
+
+  formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  // ─── 共享渲染辅助 ─────────────────────────────────────
+
+  /** render() 前置计算，子类在 render 开头调用 */
+  renderPrepare() {
+    const { requests, selectedIndex, showAll, fileLoading, fileLoadingCount, mainAgentSessions, viewMode } = this.state;
+
+    // 过滤心跳请求
+    if (this._filteredSource !== requests || this._filteredShowAll !== showAll) {
+      this._filteredSource = requests;
+      this._filteredShowAll = showAll;
+      this._filteredRequests = showAll ? requests : filterRelevantRequests(requests);
+    }
+    const filteredRequests = this._filteredRequests;
+
+    // 增量 cache loss map
+    if (this._cacheLossShowAll !== showAll) {
+      this._cacheLossShowAll = showAll;
+      this._cacheLossMap = new Map();
+      this._cacheLossLastMainAgent = null;
+      this._cacheLossProcessedCount = 0;
+    }
+    if (filteredRequests.length < this._cacheLossProcessedCount) {
+      this._cacheLossMap = new Map();
+      this._cacheLossLastMainAgent = null;
+      this._cacheLossProcessedCount = 0;
+    }
+    if (filteredRequests.length > this._cacheLossProcessedCount) {
+      this._cacheLossLastMainAgent = appendCacheLossMap(
+        this._cacheLossMap, filteredRequests,
+        this._cacheLossProcessedCount, this._cacheLossLastMainAgent
+      );
+      this._cacheLossProcessedCount = filteredRequests.length;
+    }
+
+    const selectedRequest = selectedIndex !== null ? filteredRequests[selectedIndex] : null;
+
+    return { filteredRequests, selectedRequest, fileLoading, fileLoadingCount, mainAgentSessions, viewMode };
+  }
+
+  /** 工作区选择器渲染（PC/Mobile 共用） */
+  renderWorkspaceMode() {
+    return (
+      <ConfigProvider
+        theme={{
+          algorithm: theme.darkAlgorithm,
+          token: {
+            colorPrimary: '#1668dc',
+            colorBgContainer: '#111',
+            colorBgLayout: '#0a0a0a',
+            colorBgElevated: '#1e1e1e',
+            colorBorder: '#2a2a2a',
+          },
+        }}
+      >
+        <WorkspaceList onLaunch={this.handleWorkspaceLaunch} />
+      </ConfigProvider>
+    );
+  }
+
+  /** Ant Design 暗色主题配置 */
+  get darkThemeConfig() {
+    return {
+      algorithm: theme.darkAlgorithm,
+      token: {
+        colorPrimary: '#1668dc',
+        colorBgContainer: '#111',
+        colorBgLayout: '#0a0a0a',
+        colorBgElevated: '#1e1e1e',
+        colorBorder: '#2a2a2a',
+      },
+    };
+  }
+}
+
+export default AppBase;
