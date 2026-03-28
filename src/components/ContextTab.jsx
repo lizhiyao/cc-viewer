@@ -5,6 +5,7 @@ import { renderMarkdown } from '../utils/markdown';
 import { t } from '../i18n';
 import { getContextSidebarArrowNavigation } from '../utils/contextSidebarNavigation';
 import JsonViewer from './JsonViewer';
+import ConceptHelp from './ConceptHelp';
 
 import styles from './ContextTab.module.css';
 
@@ -443,7 +444,7 @@ export default function ContextTab({ body, response }) {
   if (Array.isArray(body.tools) && body.tools.length > 0) {
     accordionSections.push({
       key: 'tools',
-      title: t('ui.context.tools'),
+      title: <>{t('ui.context.tools')} <ConceptHelp doc="ToolsFirst" /></>,
       items: body.tools.map((tool, i) => ({
         id: `tool__${i}`,
         label: tool?.name || `Tool ${i}`,

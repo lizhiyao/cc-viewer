@@ -429,6 +429,13 @@ class AppHeader extends React.Component {
     if (this.props.viewMode === 'raw' && this.props.onNavigateCacheMsg) {
       this.props.onNavigateCacheMsg(idx);
     }
+    // Auto-expand messages section if collapsed
+    if ((this.state._cacheSectionCollapsed || {}).messages) {
+      this.setState(prev => ({
+        _cacheSectionCollapsed: { ...(prev._cacheSectionCollapsed || {}), messages: false },
+      }), () => this.scrollToCacheMsg(idx));
+      return;
+    }
     const el = this._cacheScrollEl;
     if (!el) return;
     const target = el.querySelector(`[data-msg-idx="${idx}"]`);
@@ -502,13 +509,21 @@ class AppHeader extends React.Component {
       return <div className={styles.cachePopoverEmpty}>{t('ui.noCachedContent')}</div>;
     }
 
-    const renderSection = (title, items, blockClass) => {
+    const renderSection = (title, items, blockClass, sectionKey) => {
       if (items.length === 0) return null;
       const isMessages = title === t('ui.messages');
+      const sectionState = (this.state._cacheSectionCollapsed || {})[sectionKey];
+      const collapsed = sectionState !== undefined ? !!sectionState : sectionKey === 'tools';
+      const toggleCollapse = () => this.setState(prev => ({
+        _cacheSectionCollapsed: { ...(prev._cacheSectionCollapsed || {}), [sectionKey]: !collapsed },
+      }));
       return (
         <div className={styles.cacheSection}>
-          <div className={styles.cacheSectionTitle}>{title} ({items.length})</div>
-          {items.map((text, i) => {
+          <button type="button" className={styles.cacheSectionTitle} onClick={toggleCollapse} aria-expanded={!collapsed}>
+            <span className={styles.cacheSectionArrow}>{collapsed ? '▶' : '▼'}</span>
+            {title} ({items.length})
+          </button>
+          {!collapsed && items.map((text, i) => {
             const extraProps = isMessages ? { 'data-msg-idx': i } : {};
             let cls = blockClass || styles.cacheCodeBlock;
             const isHl = isMessages && i === this.state.cacheHighlightIdx;
@@ -633,9 +648,9 @@ class AppHeader extends React.Component {
             requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
           }
         }}>
-          {renderSection(t('ui.tools'), cached.tools)}
-          {renderSection(t('ui.systemPrompt'), cached.system, styles.cacheCodeBlockSystem)}
-          {renderSection(t('ui.messages'), cached.messages)}
+          {renderSection(t('ui.tools'), cached.tools, undefined, 'tools')}
+          {renderSection(t('ui.systemPrompt'), cached.system, styles.cacheCodeBlockSystem, 'system')}
+          {renderSection(t('ui.messages'), cached.messages, undefined, 'messages')}
         </div>
       </div>
     );
