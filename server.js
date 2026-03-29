@@ -90,6 +90,10 @@ let _workspaceClaudePath = null;
 let _workspaceIsNpmVersion = false;
 let _workspaceLaunched = false; // 工作区是否已经启动了会话
 
+// Ask hook bridge state (for PreToolUse AskUserQuestion hook)
+// At most one pending request at a time (Claude Code is single-threaded)
+let pendingAskHook = null; // { questions, res, timer, createdAt }
+
 // Editor session state (for $EDITOR intercept)
 const editorSessions = new Map(); // sessionId → { filePath, done, createdAt }
 // Periodically clean up abandoned editor sessions (older than 1 hour)
@@ -1035,6 +1039,90 @@ async function handleRequest(req, res) {
     return;
   }
 
+  // Ask hook bridge: long-poll endpoint for PreToolUse AskUserQuestion hook
+  if (url === '/api/ask-hook' && method === 'POST') {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+      if (body.length > 1000000) { // 1MB limit (questions may contain large previews)
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Request body too large' }));
+        return;
+      }
+    });
+    req.on('end', () => {
+      try {
+        const { questions } = JSON.parse(body);
+        if (!Array.isArray(questions) || questions.length === 0) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Missing questions' }));
+          return;
+        }
+
+        // Cancel any previous pending hook request
+        if (pendingAskHook) {
+          try {
+            if (!pendingAskHook.res.headersSent) {
+              pendingAskHook.res.writeHead(409, { 'Content-Type': 'application/json' });
+              pendingAskHook.res.end(JSON.stringify({ error: 'Superseded' }));
+            }
+          } catch {}
+          clearTimeout(pendingAskHook.timer);
+        }
+
+        const HOOK_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+        const timer = setTimeout(() => {
+          if (pendingAskHook && pendingAskHook.res === res) {
+            pendingAskHook = null;
+            try {
+              if (!res.headersSent) {
+                res.writeHead(408, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Timeout' }));
+              }
+            } catch {}
+            // Broadcast timeout to clients
+            if (terminalWss) {
+              const tmsg = JSON.stringify({ type: 'ask-hook-timeout' });
+              terminalWss.clients.forEach((c) => {
+                if (c.readyState === 1) try { c.send(tmsg); } catch {}
+              });
+            }
+          }
+        }, HOOK_TIMEOUT);
+
+        pendingAskHook = { questions, res, timer, createdAt: Date.now() };
+
+        // Broadcast to all terminal WS clients
+        if (terminalWss) {
+          const pmsg = JSON.stringify({ type: 'ask-hook-pending', questions });
+          terminalWss.clients.forEach((client) => {
+            if (client.readyState === 1) {
+              try { client.send(pmsg); } catch {}
+            }
+          });
+        }
+
+        // Handle ask-bridge.js disconnection
+        req.on('close', () => {
+          if (pendingAskHook && pendingAskHook.res === res) {
+            clearTimeout(pendingAskHook.timer);
+            pendingAskHook = null;
+            if (terminalWss) {
+              const tmsg = JSON.stringify({ type: 'ask-hook-timeout' });
+              terminalWss.clients.forEach((c) => {
+                if (c.readyState === 1) try { c.send(tmsg); } catch {}
+              });
+            }
+          }
+        });
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid request body' }));
+      }
+    });
+    return;
+  }
+
   // 读取文件内容 API
   if (url === '/api/file-content' && method === 'GET') {
     const reqPath = parsedUrl.searchParams.get('path');
@@ -1832,6 +1920,19 @@ async function setupTerminalWebSocket(httpServer) {
                   ws.send(JSON.stringify({ type: 'input-sequential-done', ok }));
                 } catch {}
               }, { settleMs: msg.settleMs || 150 });
+            }
+          } else if (msg.type === 'ask-hook-answer') {
+            // Client answered AskUserQuestion via hook bridge
+            if (pendingAskHook) {
+              const { res: hookRes, timer } = pendingAskHook;
+              clearTimeout(timer);
+              pendingAskHook = null;
+              try {
+                if (!hookRes.headersSent) {
+                  hookRes.writeHead(200, { 'Content-Type': 'application/json' });
+                  hookRes.end(JSON.stringify({ answers: msg.answers }));
+                }
+              } catch {}
             }
           } else if (msg.type === 'resize') {
             // 存储该客户端的尺寸

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.55 (2026-03-29)
+
+- Feature: PreToolUse hook bridge for AskUserQuestion — bypass PTY keyboard simulation with structured JSON answers via `lib/ask-bridge.js`
+- Feature: `/api/ask-hook` long-poll HTTP endpoint — bridges hook script with cc-viewer web UI for AskUserQuestion
+- Feature: `ask-hook-answer` WebSocket message type — routes user answers from web UI to hook bridge
+- Feature: `CCVIEWER_PORT` environment variable passed to PTY child process for hook bridge discovery
+- Feature: graceful fallback — if hook not configured or cc-viewer unreachable, falls back to existing PTY simulation
+
 ## 1.6.54 (2026-03-28)
 
 - Feature: Plan approval GUI — display plan content preview and interactive Approve/Edit/Reject buttons in conversation view (ExitPlanMode)

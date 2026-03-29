@@ -470,6 +470,8 @@ class ChatView extends React.Component {
     this._ptyDataSeq = 0; // increments on every PTY output event
     this._ptyDebounceTimer = null;
     this._currentPtyPrompt = null; // 同步跟踪 ptyPrompt，避免闭包捕获旧 state
+    this._askHookActive = false;   // PreToolUse hook bridge is pending
+    this._askHookQuestions = null;  // questions from hook bridge
     this._mobileExtraItems = 0;
     this._mobileSliceOffset = 0;
     this._totalItemCount = 0;
@@ -1241,6 +1243,12 @@ class ChatView extends React.Component {
           this._appendPtyData(msg.data);
         } else if (msg.type === 'exit') {
           this._clearPtyPrompt();
+        } else if (msg.type === 'ask-hook-pending') {
+          this._askHookActive = true;
+          this._askHookQuestions = msg.questions;
+        } else if (msg.type === 'ask-hook-timeout') {
+          this._askHookActive = false;
+          this._askHookQuestions = null;
         }
       } catch {}
     };
@@ -1481,6 +1489,13 @@ class ChatView extends React.Component {
    * answers: [{ questionIndex, type: 'single'|'multi'|'other', optionIndex, selectedIndices, text }]
    */
   handleAskQuestionSubmit = (answers) => {
+    // Hook bridge path: submit structured JSON instead of PTY simulation
+    // Guard: don't switch to hook path if PTY submission is already in progress
+    if (this._askHookActive && !this._askSubmitting) {
+      this._submitViaHookBridge(answers);
+      return;
+    }
+
     const ws = this._inputWs;
 
     // Lazily connect WebSocket if not connected
@@ -1640,6 +1655,63 @@ class ChatView extends React.Component {
     } else {
       this._askSubmitting = false;
     }
+  }
+
+  /**
+   * Submit AskUserQuestion answers via hook bridge (structured JSON, no PTY simulation).
+   * Converts client answer format to hook answer format and sends via WebSocket.
+   */
+  _submitViaHookBridge(answers) {
+    const ws = this._inputWs;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      // Fallback to PTY path
+      this._askHookActive = false;
+      this._askHookQuestions = null;
+      this.handleAskQuestionSubmit(answers);
+      return;
+    }
+
+    this._askSubmitting = true;
+
+    const questions = this._askHookQuestions || [];
+    const hookAnswers = {};
+
+    for (const answer of answers) {
+      const q = questions[answer.questionIndex];
+      if (!q) continue;
+      const questionText = q.question;
+
+      if (answer.type === 'other') {
+        hookAnswers[questionText] = answer.text || '';
+      } else if (answer.type === 'multi') {
+        const labels = (answer.selectedIndices || [])
+          .map((i) => q.options?.[i]?.label)
+          .filter(Boolean);
+        hookAnswers[questionText] = labels.join(', ');
+      } else {
+        // single
+        hookAnswers[questionText] = q.options?.[answer.optionIndex]?.label || '';
+      }
+    }
+
+    ws.send(JSON.stringify({ type: 'ask-hook-answer', answers: hookAnswers }));
+
+    // Clear hook state
+    this._askHookActive = false;
+    this._askHookQuestions = null;
+    this._askSubmitting = false;
+
+    // Update UI state — mark prompt as answered
+    this._currentPtyPrompt = null;
+    this.setState((state) => {
+      const history = state.ptyPromptHistory.slice();
+      const last = history[history.length - 1];
+      if (last && last.status === 'active') {
+        history[history.length - 1] = { ...last, status: 'answered' };
+      }
+      return { ptyPrompt: null, ptyPromptHistory: history };
+    });
+    if (this._ptyDebounceTimer) clearTimeout(this._ptyDebounceTimer);
   }
 
   handleInputSend = () => {

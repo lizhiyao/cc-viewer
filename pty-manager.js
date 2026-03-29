@@ -121,6 +121,7 @@ export async function spawnClaude(proxyPort, cwd, extraArgs = [], claudePath = n
     env.EDITOR = `${process.execPath} ${editorScript}`;
     env.VISUAL = env.EDITOR;
     env.CCV_EDITOR_PORT = String(serverPort);
+    env.CCVIEWER_PORT = String(serverPort); // For ask-hook bridge
   }
 
   // 通过 --settings 注入 ANTHROPIC_BASE_URL，确保覆盖 settings.json 中的配置。
