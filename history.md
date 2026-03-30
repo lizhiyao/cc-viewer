@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.66 (2026-03-30)
+
+- Fix: iOS mobile chat panel height — `mobileCLIBody` missing `display: flex; flex-direction: column`, causing chat area to collapse instead of filling available height
+
 ## 1.6.65 (2026-03-30)
 
 - Fix: AskUserQuestion submit from chat panel — resolve timing race where streaming response renders interactive card before PreToolUse hook bridge is ready, causing submit button to hang in "submitting" state
