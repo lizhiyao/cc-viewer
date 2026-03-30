@@ -20,6 +20,10 @@ export default class AskQuestionForm extends React.Component {
     };
   }
 
+  componentWillUnmount() {
+    if (this._submitTimeout) clearTimeout(this._submitTimeout);
+  }
+
   render() {
     const { questions: rawQuestions, onSubmit } = this.props;
     const questions = Array.isArray(rawQuestions) ? rawQuestions : [];
@@ -37,6 +41,12 @@ export default class AskQuestionForm extends React.Component {
     const handleSubmit = () => {
       if (!allValid || submitting) return;
       this.setState({ submitting: true });
+      // 超时恢复：30s 后重置提交状态，防止卡在"提交中..."
+      // 需覆盖最长路径：hook bridge 等待 3s + PTY prompt 等待 5s + sequential queue 15s
+      if (this._submitTimeout) clearTimeout(this._submitTimeout);
+      this._submitTimeout = setTimeout(() => {
+        this.setState({ submitting: false });
+      }, 30000);
       const answers = questions.map((q, qi) => {
         if (otherActive[qi]) {
           const optCount = (q.options || []).length;

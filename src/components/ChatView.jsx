@@ -121,8 +121,11 @@ class ChatView extends React.Component {
     this._ptyDataSeq = 0; // increments on every PTY output event
     this._ptyDebounceTimer = null;
     this._currentPtyPrompt = null; // 同步跟踪 ptyPrompt，避免闭包捕获旧 state
-    this._askHookActive = false;   // PreToolUse hook bridge is pending
-    this._askHookQuestions = null;  // questions from hook bridge
+    this._askHookActive = false;      // PreToolUse hook bridge is pending
+    this._askHookQuestions = null;    // questions from hook bridge
+    this._pendingHookAnswers = null;  // answers waiting for hook bridge
+    this._askHookWaitRetries = 0;     // hook bridge wait retry counter
+    this._hookWaitTimer = null;       // hook bridge wait timer
     this._mobileExtraItems = 0;
     this._mobileSliceOffset = 0;
     this._totalItemCount = 0;
@@ -334,6 +337,8 @@ class ChatView extends React.Component {
     if (this._waitForPtyTimer) clearTimeout(this._waitForPtyTimer);
     if (this._planFeedbackTimer) clearTimeout(this._planFeedbackTimer);
     if (this._streamingFadeTimer) clearTimeout(this._streamingFadeTimer);
+    if (this._hookWaitTimer) clearTimeout(this._hookWaitTimer);
+    this._pendingHookAnswers = null;
     this._unbindScrollFade();
     if (!isMobile) this._unbindStickyScroll();
     if (this._inputWs) {
@@ -1319,6 +1324,47 @@ class ChatView extends React.Component {
       return;
     }
 
+    // Hook bridge 可能尚未就绪（streaming response 先于 hook 触发的时序竞争）：
+    // WebSocket 已连接但 ask-hook-pending 消息还没到 → 短暂等待再决定路径
+    if (!this._askHookActive && !this._askSubmitting
+        && this._inputWs && this._inputWs.readyState === WebSocket.OPEN) {
+      this._pendingHookAnswers = answers;
+      this._askHookWaitRetries = 0;
+      this._askSubmitting = true;
+      this._waitForHookBridge();
+      return;
+    }
+
+    this._submitViaPty(answers);
+  };
+
+  /**
+   * 等待 hook bridge（ask-hook-pending）到达，最多 3s。
+   * 解决：对话面板渲染 AskUserQuestion 卡片远早于 PreToolUse hook 触发。
+   */
+  _waitForHookBridge() {
+    if (this._unmounted) return;
+    if (this._askHookActive) {
+      const answers = this._pendingHookAnswers;
+      this._pendingHookAnswers = null;
+      this._submitViaHookBridge(answers);
+      return;
+    }
+    this._askHookWaitRetries = (this._askHookWaitRetries || 0) + 1;
+    if (this._askHookWaitRetries > 30) { // 3s 超时
+      // Hook bridge 未到达，fallback 到 PTY 路径
+      const answers = this._pendingHookAnswers;
+      this._pendingHookAnswers = null;
+      this._submitViaPty(answers);
+      return;
+    }
+    this._hookWaitTimer = setTimeout(() => this._waitForHookBridge(), 100);
+  }
+
+  /**
+   * PTY 模拟路径（原有逻辑，从 handleAskQuestionSubmit 提取）
+   */
+  _submitViaPty(answers) {
     const ws = this._inputWs;
 
     // Lazily connect WebSocket if not connected
@@ -1345,7 +1391,7 @@ class ChatView extends React.Component {
     }
 
     this._processNextAskAnswer();
-  };
+  }
 
   _waitForWsAndSubmit() {
     this._askWsRetries = (this._askWsRetries || 0) + 1;
@@ -1487,10 +1533,10 @@ class ChatView extends React.Component {
   _submitViaHookBridge(answers) {
     const ws = this._inputWs;
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      // Fallback to PTY path
+      // Fallback to PTY path（直接走 PTY，跳过路由判断避免 WS reconnect 竞态白等 3s）
       this._askHookActive = false;
       this._askHookQuestions = null;
-      this.handleAskQuestionSubmit(answers);
+      this._submitViaPty(answers);
       return;
     }
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.65 (2026-03-30)
+
+- Fix: AskUserQuestion submit from chat panel — resolve timing race where streaming response renders interactive card before PreToolUse hook bridge is ready, causing submit button to hang in "submitting" state
+- Fix: add hook bridge wait mechanism (up to 3s polling) before falling back to PTY simulation path
+- Fix: `_submitViaHookBridge` fallback now directly calls PTY path, avoiding unnecessary 3s delay on WS reconnect race
+- Fix: submit button auto-recovers after 30s timeout to prevent permanent "submitting" lock
+- Fix: `_waitForHookBridge` guarded against unmounted component state updates
+- Fix: duplicate submission prevented by setting `_askSubmitting` before hook bridge wait
+
 ## 1.6.64 (2026-03-30)
 
 - Feature: mobile SSE pagination — initial load limited to latest 200 entries (checkpoint-aligned), history loaded on-demand in 100-entry batches via `/api/entries/page` REST endpoint
