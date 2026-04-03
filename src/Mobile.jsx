@@ -333,6 +333,7 @@ class Mobile extends AppBase {
                     userProfile={this.state.userProfile}
                     collapseToolResults={this.state.collapseToolResults}
                     expandThinking={this.state.expandThinking}
+                    showFullToolContent={this.state.showFullToolContent}
                     showThinkingSummaries={this.state.showThinkingSummaries}
                     onViewRequest={null}
                     scrollToTimestamp={null}
@@ -378,6 +379,7 @@ class Mobile extends AppBase {
                   userProfile={this.state.userProfile}
                   collapseToolResults={this.state.collapseToolResults}
                   expandThinking={this.state.expandThinking}
+                  showFullToolContent={this.state.showFullToolContent}
                   showThinkingSummaries={this.state.showThinkingSummaries}
                   onViewRequest={null}
                   scrollToTimestamp={null}
@@ -490,6 +492,13 @@ class Mobile extends AppBase {
                 <Switch
                   checked={!!this.state.expandThinking}
                   onChange={this.handleExpandThinkingChange}
+                />
+              </div>
+              <div className={styles.mobileSettingsRow}>
+                <span className={styles.mobileSettingsLabel}>{t('ui.showFullToolContent')}</span>
+                <Switch
+                  checked={!!this.state.showFullToolContent}
+                  onChange={this.handleShowFullToolContentChange}
                 />
               </div>
             </div>

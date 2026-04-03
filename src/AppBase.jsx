@@ -54,6 +54,7 @@ class AppBase extends React.Component {
       collapseToolResults: true,
       expandThinking: true,
       expandDiff: false,
+      showFullToolContent: false,
       showThinkingSummaries: false,
       fileLoading: false,
       fileLoadingCount: 0,
@@ -204,6 +205,9 @@ class AppBase extends React.Component {
         }
         if (data.expandDiff !== undefined) {
           this.setState({ expandDiff: !!data.expandDiff });
+        }
+        if (data.showFullToolContent !== undefined) {
+          this.setState({ showFullToolContent: !!data.showFullToolContent });
         }
         if (data.resumeAutoChoice) {
           this.setState({ resumeAutoChoice: data.resumeAutoChoice });
@@ -1185,6 +1189,15 @@ class AppBase extends React.Component {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ expandDiff: checked }),
+    }).catch(() => { });
+  };
+
+  handleShowFullToolContentChange = (checked) => {
+    this.setState({ showFullToolContent: checked });
+    fetch(apiUrl('/api/preferences'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ showFullToolContent: checked }),
     }).catch(() => { });
   };
 

@@ -264,6 +264,61 @@
   color: #a78bfa;
 }
 
+.simplifiedToolLabel {
+  display: inline-block;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-right: 4px;
+  line-height: 24px;
+  vertical-align: middle;
+}
+
+.simplifiedToolTag {
+  display: inline-block;
+  padding: 1px 8px;
+  margin: 2px 4px 2px 0;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
+  color: rgba(255, 255, 255, 0.45);
+  background: #1f1f1f;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.simplifiedToolTag:hover {
+  border-color: #555;
+}
+
+:global(.simplifiedToolPopover) .ant-popover-inner {
+  background: #1a1a2e;
+  border: 1px solid #2a2a3e;
+  padding: 0;
+}
+
+:global(.simplifiedToolPopover) .ant-popover-arrow::before,
+:global(.simplifiedToolPopover) .ant-popover-arrow::after {
+  background: #1a1a2e;
+}
+
+.simplifiedToolPopoverContent {
+  max-width: 520px;
+  max-height: 360px;
+  overflow: auto;
+}
+
+:global(.simplifiedToolPopover) {
+  max-width: calc(100vw - 24px);
+}
+
+@media (max-width: 768px) {
+  .simplifiedToolPopoverContent {
+    max-width: calc(100vw - 48px);
+    max-height: 260px;
+  }
+}
+
 /* === Code pre inside tool boxes === */
 
 .codePre {

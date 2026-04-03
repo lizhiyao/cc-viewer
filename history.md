@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.91 (2026-04-03)
+
+- Feat: add simplified tool display mode — tool calls collapse to compact tags by default, Edit/Write/Agent/TaskCreate/EnterPlanMode/ExitPlanMode/AskUserQuestion keep full display
+- Feat: hover popover on simplified tags (desktop), click popover with zoom fix (mobile)
+- Feat: "完整展示所有内容" toggle in settings (default OFF = simplified mode)
+- Feat: gray "调用工具:" label before simplified tool tags, resets after full-display tools
+- Fix: Write tool no longer truncates at 20 lines
+- Fix: Agent/TaskCreate tool content no longer truncates at 200 chars
+
 ## 1.6.90 (2026-04-03)
 
 - Fix: shell hook re-injection — use `ccv -logger` instead of `ccv` to prevent launching programming mode when claude is invoked

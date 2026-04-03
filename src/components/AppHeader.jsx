@@ -81,6 +81,7 @@ class AppHeader extends React.Component {
       nextProps.projectName !== this.props.projectName ||
       nextProps.collapseToolResults !== this.props.collapseToolResults ||
       nextProps.expandThinking !== this.props.expandThinking ||
+      nextProps.showFullToolContent !== this.props.showFullToolContent ||
       nextProps.expandDiff !== this.props.expandDiff ||
       nextProps.filterIrrelevant !== this.props.filterIrrelevant ||
       nextProps.cliMode !== this.props.cliMode ||
@@ -1171,7 +1172,7 @@ class AppHeader extends React.Component {
   }
 
   render() {
-    const { requestCount, requests = [], viewMode, cacheType, onToggleViewMode, onImportLocalLogs, onLangChange, isLocalLog, localLogFile, projectName, collapseToolResults, onCollapseToolResultsChange, expandThinking, onExpandThinkingChange, expandDiff, onExpandDiffChange, filterIrrelevant, onFilterIrrelevantChange, updateInfo, onDismissUpdate, cliMode, terminalVisible, onToggleTerminal, onReturnToWorkspaces, contextWindow, serverCachedContent, resumeAutoChoice, onResumeAutoChoiceToggle, onResumeAutoChoiceChange } = this.props;
+    const { requestCount, requests = [], viewMode, cacheType, onToggleViewMode, onImportLocalLogs, onLangChange, isLocalLog, localLogFile, projectName, collapseToolResults, onCollapseToolResultsChange, expandThinking, onExpandThinkingChange, showFullToolContent, onShowFullToolContentChange, expandDiff, onExpandDiffChange, filterIrrelevant, onFilterIrrelevantChange, updateInfo, onDismissUpdate, cliMode, terminalVisible, onToggleTerminal, onReturnToWorkspaces, contextWindow, serverCachedContent, resumeAutoChoice, onResumeAutoChoiceToggle, onResumeAutoChoiceChange } = this.props;
     const { countdownText } = this.state;
 
     const menuItems = [
@@ -1543,6 +1544,13 @@ class AppHeader extends React.Component {
               <Switch
                 checked={!!expandThinking}
                 onChange={(checked) => onExpandThinkingChange && onExpandThinkingChange(checked)}
+              />
+            </div>
+            <div className={styles.settingsItem}>
+              <span className={styles.settingsLabel}>{t('ui.showFullToolContent')}</span>
+              <Switch
+                checked={!!showFullToolContent}
+                onChange={(checked) => onShowFullToolContentChange && onShowFullToolContentChange(checked)}
               />
             </div>
           </div>
