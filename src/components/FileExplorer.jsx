@@ -34,7 +34,7 @@ function getFileIcon(name, type) {
   );
 }
 
-function TreeNode({ item, path, depth, onFileClick, expandedPaths, onToggleExpand, currentFile, onFileRenamed, refreshTrigger }) {
+function TreeNode({ item, path, depth, onFileClick, expandedPaths, onToggleExpand, currentFile, onFileRenamed, refreshTrigger, onHtmlPreview }) {
   const [children, setChildren] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -80,9 +80,9 @@ function TreeNode({ item, path, depth, onFileClick, expandedPaths, onToggleExpan
   const toggle = useCallback(async () => {
     if (item.type !== 'directory') {
       const ext = (childPath || '').split('.').pop().toLowerCase();
-      // .html/.htm 文件直接在浏览器中打开
+      // .html/.htm 文件在弹窗 iframe 中预览
       if (ext === 'html' || ext === 'htm') {
-        window.open(`/api/file-raw?path=${encodeURIComponent(childPath)}`, '_blank');
+        if (onHtmlPreview) onHtmlPreview(childPath);
         return;
       }
       // Office 文件用系统默认应用打开
@@ -104,7 +104,7 @@ function TreeNode({ item, path, depth, onFileClick, expandedPaths, onToggleExpan
       await fetchChildren();
     }
     onToggleExpand(childPath);
-  }, [expanded, children, childPath, item, onFileClick, onToggleExpand, fetchChildren]);
+  }, [expanded, children, childPath, item, onFileClick, onToggleExpand, fetchChildren, onHtmlPreview]);
 
   const isDir = item.type === 'directory';
   const isSelected = currentFile && currentFile === childPath;
@@ -375,15 +375,16 @@ function TreeNode({ item, path, depth, onFileClick, expandedPaths, onToggleExpan
         <div className={styles.error} style={{ paddingLeft: 24 + depth * 16 }}>{error}</div>
       )}
       {expanded && children && children.map(child => (
-        <TreeNode key={child.name} item={child} path={childPath} depth={depth + 1} onFileClick={onFileClick} expandedPaths={expandedPaths} onToggleExpand={onToggleExpand} currentFile={currentFile} onFileRenamed={onFileRenamed} refreshTrigger={refreshTrigger} />
+        <TreeNode key={child.name} item={child} path={childPath} depth={depth + 1} onFileClick={onFileClick} expandedPaths={expandedPaths} onToggleExpand={onToggleExpand} currentFile={currentFile} onFileRenamed={onFileRenamed} refreshTrigger={refreshTrigger} onHtmlPreview={onHtmlPreview} />
       ))}
     </>
   );
 }
 
-export default function FileExplorer({ onClose, onFileClick, expandedPaths, onToggleExpand, currentFile, refreshTrigger, onFileRenamed }) {
+export default function FileExplorer({ style, onClose, onFileClick, expandedPaths, onToggleExpand, currentFile, refreshTrigger, onFileRenamed }) {
   const [items, setItems] = useState(null);
   const [error, setError] = useState(null);
+  const [htmlPreviewPath, setHtmlPreviewPath] = useState(null);
   const mounted = useRef(true);
 
   // 重新加载根目录
@@ -494,7 +495,7 @@ export default function FileExplorer({ onClose, onFileClick, expandedPaths, onTo
   }, [onFileRenamed]);
 
   return (
-    <div className={styles.fileExplorer}>
+    <div className={styles.fileExplorer} style={style}>
       <div className={styles.header}>
         <Dropdown menu={{ items: headerMenuItems, onClick: handleHeaderMenuClick }} trigger={['contextMenu']}>
           <span className={styles.headerTitle}>
@@ -513,9 +514,35 @@ export default function FileExplorer({ onClose, onFileClick, expandedPaths, onTo
         {error && <div className={styles.error}>{error}</div>}
         {!items && !error && <div className={styles.loading}>Loading...</div>}
         {items && items.map(item => (
-          <TreeNode key={item.name} item={item} path="" depth={0} onFileClick={onFileClick} expandedPaths={expandedPaths} onToggleExpand={onToggleExpand} currentFile={currentFile} onFileRenamed={onFileRenamed} refreshTrigger={refreshTrigger} />
+          <TreeNode key={item.name} item={item} path="" depth={0} onFileClick={onFileClick} expandedPaths={expandedPaths} onToggleExpand={onToggleExpand} currentFile={currentFile} onFileRenamed={onFileRenamed} refreshTrigger={refreshTrigger} onHtmlPreview={setHtmlPreviewPath} />
         ))}
       </div>
+      {htmlPreviewPath && (
+        <Modal
+          open
+          onCancel={() => setHtmlPreviewPath(null)}
+          footer={null}
+          closable
+          maskClosable
+          zIndex={1100}
+          width="calc(100vw - 80px)"
+          title={<span style={{ color: '#e5e5e5', fontSize: 14 }}>{htmlPreviewPath.split('/').pop() || 'Preview'}</span>}
+          styles={{
+            header: { background: '#111', borderBottom: '1px solid #2a2a2a', padding: '12px 20px' },
+            body: { background: '#fff', height: 'calc(100vh - 160px)', overflow: 'hidden', padding: 0 },
+            mask: { background: 'rgba(0,0,0,0.7)' },
+            content: { background: '#111', border: '1px solid #2a2a2a', borderRadius: 8, padding: 0 },
+          }}
+          centered
+        >
+          <iframe
+            src={apiUrl(`/api/file-raw?path=${encodeURIComponent(htmlPreviewPath)}`)}
+            style={{ width: '100%', height: '100%', border: 'none' }}
+            title={htmlPreviewPath}
+            sandbox="allow-scripts allow-popups allow-forms"
+          />
+        </Modal>
+      )}
     </div>
   );
 }

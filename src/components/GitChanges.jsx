@@ -118,7 +118,7 @@ function TreeDir({ name, node, depth, onFileClick, onOpenFile, onRestore, select
   );
 }
 
-export default function GitChanges({ onClose, onFileClick, onOpenFile, refreshTrigger }) {
+export default function GitChanges({ style, onClose, onFileClick, onOpenFile, refreshTrigger }) {
   const [changes, setChanges] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -178,7 +178,7 @@ export default function GitChanges({ onClose, onFileClick, onOpenFile, refreshTr
   }, [refreshTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className={styles.gitChanges}>
+    <div className={styles.gitChanges} style={style}>
       <div className={styles.header}>
         <span className={styles.headerTitle}>{t('ui.gitChanges')}</span>
         <button className={styles.collapseBtn} onClick={onClose} title="Close">

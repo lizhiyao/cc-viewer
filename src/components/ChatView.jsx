@@ -79,6 +79,7 @@ class ChatView extends React.Component {
       highlightTs: null,
       highlightFading: false,
       highlightVisibleIdx: -1,
+      sidebarWidth: parseInt(localStorage.getItem('cc-viewer-sidebar-width'), 10) || 240,
       terminalWidth: initialTerminalWidth || 624, // 默认 80cols * 7.8px
       needsInitialSnap: initialTerminalWidth === null, // 标记是否需要初始化吸附
       inputEmpty: true,
@@ -122,6 +123,7 @@ class ChatView extends React.Component {
     this._scrollTargetRef = React.createRef();
     this._scrollFadeTimer = null;
     this._resizing = false;
+    this._dragTarget = null; // 'terminal' | 'sidebar'
     this._inputWs = null;
     this._inputRef = React.createRef();
     this._ptyBuffer = '';
@@ -1968,6 +1970,7 @@ class ChatView extends React.Component {
   handleSplitMouseDown = (e) => {
     e.preventDefault();
     this._resizing = true;
+    this._dragTarget = 'terminal';
 
     // 计算吸附线位置（基于终端标准列宽）
     let snapLines = [];
@@ -2037,6 +2040,7 @@ class ChatView extends React.Component {
 
     const onMouseUp = () => {
       this._resizing = false;
+      this._dragTarget = null;
 
       // 松开鼠标时，吸附到最近的线
       if (this.state.activeSnapLine) {
@@ -2059,6 +2063,78 @@ class ChatView extends React.Component {
           snapLines: [],
           needsInitialSnap: false
         });
+      }
+
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  handleSidebarMouseDown = (e) => {
+    e.preventDefault();
+    this._resizing = true;
+    this._dragTarget = 'sidebar';
+
+    // 吸附线：180, 240, 300, 360（间距 60px）
+    const sidebarSnapWidths = [180, 240, 300, 360];
+    const container = this.innerSplitRef.current;
+    let snapLines = [];
+    if (container) {
+      const containerWidth = container.getBoundingClientRect().width;
+      snapLines = sidebarSnapWidths
+        .filter(w => w < containerWidth * 0.4)
+        .map(w => ({ cols: w, terminalPx: w, linePosition: w }));
+    }
+
+    this.setState({ isDragging: true, snapLines });
+
+    const onMouseMove = (ev) => {
+      if (!this._resizing) return;
+      const container = this.innerSplitRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const containerWidth = rect.width;
+      let sw = ev.clientX - rect.left;
+      sw = Math.max(160, Math.min(containerWidth * 0.4, sw));
+
+      // 吸附逻辑（与终端一致，阈值 60px）
+      let activeSnapLine = null;
+      if (snapLines.length > 0) {
+        const snapThreshold = 60;
+        let minDistance = Infinity;
+        let closestSnap = null;
+        for (const snap of snapLines) {
+          const distance = Math.abs(sw - snap.linePosition);
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestSnap = snap;
+          }
+        }
+        if (closestSnap && minDistance < snapThreshold) {
+          activeSnapLine = closestSnap;
+        }
+      }
+
+      this.setState({ sidebarWidth: sw, activeSnapLine });
+    };
+
+    const onMouseUp = () => {
+      this._resizing = false;
+      this._dragTarget = null;
+
+      if (this.state.activeSnapLine) {
+        const newWidth = this.state.activeSnapLine.linePosition;
+        localStorage.setItem('cc-viewer-sidebar-width', newWidth.toString());
+        this.setState({ sidebarWidth: newWidth, isDragging: false, activeSnapLine: null, snapLines: [] });
+      } else {
+        localStorage.setItem('cc-viewer-sidebar-width', this.state.sidebarWidth.toString());
+        this.setState({ isDragging: false, activeSnapLine: null, snapLines: [] });
       }
 
       document.removeEventListener('mousemove', onMouseMove);
@@ -2223,7 +2299,18 @@ class ChatView extends React.Component {
 
   render() {
     const { mainAgentSessions, cliMode, terminalVisible, onToggleTerminal } = this.props;
-    const { allItems, visibleCount, loading, terminalWidth, lastResponseItems } = this.state;
+    const { allItems, visibleCount, loading, terminalWidth, sidebarWidth, lastResponseItems } = this.state;
+
+    // 计算 SnapLineOverlay 的 currentLeft（侧栏拖拽时用侧栏宽度，终端拖拽时用终端位置）
+    let snapCurrentLeft = 0;
+    if (this.state.isDragging) {
+      if (this._dragTarget === 'sidebar') {
+        snapCurrentLeft = sidebarWidth;
+      } else if (this._dragTarget === 'terminal') {
+        const c = this.innerSplitRef.current;
+        if (c) snapCurrentLeft = c.getBoundingClientRect().width - terminalWidth - 5;
+      }
+    }
 
     const noMainAgent = !mainAgentSessions || mainAgentSessions.length === 0;
     const noData = noMainAgent && (!allItems || allItems.length === 0);
@@ -2532,9 +2619,10 @@ class ChatView extends React.Component {
           </Popover>
         </div>
         <div className={styles.innerSplitArea} ref={this.innerSplitRef}>
-          <SnapLineOverlay isDragging={this.state.isDragging} activeSnapLine={this.state.activeSnapLine} snapLines={this.state.snapLines} terminalWidth={this.state.terminalWidth} containerRef={this.innerSplitRef} />
+          <SnapLineOverlay isDragging={this.state.isDragging} activeSnapLine={this.state.activeSnapLine} snapLines={this.state.snapLines} currentLeft={snapCurrentLeft} />
           {this.state.fileExplorerOpen && (
             <FileExplorer
+              style={{ width: this.state.sidebarWidth }}
               refreshTrigger={this.state.fileExplorerRefresh}
               onClose={() => this._setFileExplorerOpen(false)}
               onFileClick={(path) => this.setState({ currentFile: path, currentGitDiff: null, scrollToLine: null })}
@@ -2551,6 +2639,7 @@ class ChatView extends React.Component {
           )}
           {this.state.gitChangesOpen && (
             <GitChanges
+              style={{ width: this.state.sidebarWidth }}
               refreshTrigger={this.state.gitChangesRefresh}
               onClose={() => this.setState({ gitChangesOpen: false })}
               onFileClick={(path) => this.setState({ currentGitDiff: path, currentFile: null })}
@@ -2566,6 +2655,9 @@ class ChatView extends React.Component {
                 });
               }}
             />
+          )}
+          {(this.state.fileExplorerOpen || this.state.gitChangesOpen) && (
+            <div className={styles.vResizer} onMouseDown={this.handleSidebarMouseDown} />
           )}
           <div className={styles.chatSection}>
             <div className={styles.chatSectionFlex}>

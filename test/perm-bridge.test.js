@@ -11,7 +11,7 @@ const bridgePath = join(__dirname, '..', 'lib', 'perm-bridge.js');
 function runBridge(stdin, env = {}) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [bridgePath], {
-      env: { ...process.env, ...env },
+      env: { ...process.env, CCV_BYPASS_PERMISSIONS: '', ...env },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     let stdout = '';
