@@ -72,7 +72,7 @@ function ToolApprovalPanel({ toolName, toolInput, requestId, onAllow, onAllowSes
     <div ref={panelRef} className={`${isGlobal ? styles.panelGlobal : styles.panel}${exiting ? ` ${styles.exiting}` : ''}`} onKeyDown={handleKeyDown}>
       <svg className={`${styles.borderSvg} ${styles.borderSvgInset}`} preserveAspectRatio="none">
         <rect x="0" y="0" width="100%" height="100%" rx="12" ry="12"
-          fill="none" stroke="#f59e0b" strokeWidth="1" strokeDasharray="6 4"
+          fill="none" stroke="var(--color-approval-border)" strokeWidth="1" strokeDasharray="6 4"
           className={styles.borderRect} />
       </svg>
       <div className={styles.header}>

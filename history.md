@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.6.114 (2026-04-07)
+
+- Fix: model avatar background hardcoded #000 → var(--bg-model-avatar), light theme uses #e8e8e8
+- Fix: ToolApprovalPanel shadow too heavy in light mode — extracted to CSS variables
+- Fix: approval panel dashed border and label color now use CSS variables, black in light mode
+- Fix: chat input bar background dark overlay in light mode → white
+- Fix: Write/Bash tool detail text hardcoded #c9d1d9 → var(--text-primary)
+- Fix: sticky bottom button background dark in light mode → white translucent
+- Fix: chat-boxer hover gradient too dark in light mode — lighter values + direction flipped
+- UI: .chat-md inline code color uses blue (#0969DA) in light mode
+
 ## 1.6.113 (2026-04-07)
 
 - Feat: light theme (Standard White) — full CSS variable system with `[data-theme]` switching

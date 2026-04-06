@@ -112,7 +112,7 @@
 }
 
 .stickyBottomBtn span {
-  background: var(--overlay-dark-light);
+  background: var(--bg-sticky-btn);
   padding: 2px 10px;
   border-radius: 10px;
 }

@@ -1,6 +1,6 @@
 .chatInputBar {
   padding: 8px 16px 12px;
-  background: var(--overlay-dark-light);
+  background: var(--bg-input-bar);
   flex-shrink: 0;
 }
 

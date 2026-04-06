@@ -105,6 +105,21 @@
   --color-code-orange-border: rgba(217, 119, 87, 0.27);
   --color-code-orange-bg: rgba(217, 119, 87, 0.07);
   --bg-container-alt: #161616;
+  /* Model avatar */
+  --bg-model-avatar: #000;
+  /* Input bar / sticky */
+  --bg-input-bar: rgba(0, 0, 0, 0.5);
+  --bg-sticky-btn: rgba(0, 0, 0, 0.5);
+  --chat-boxer-gradient-dir: to top;
+  --chat-boxer-bg-from: var(--bg-surface);
+  --chat-boxer-bg-to: var(--border-secondary);
+  --chat-boxer-hover-from: var(--border-secondary);
+  --chat-boxer-hover-to: var(--border-hover);
+  /* Approval panel */
+  --shadow-approval-heavy: rgba(0, 0, 0, 0.6);
+  --shadow-approval-glow: rgba(245, 158, 11, 0.15);
+  --color-approval-border: #f59e0b;
+  --color-approval-label: #fbbf24;
   /* Gray / Overlay */
   --color-gray-bg-light: rgba(107, 114, 128, 0.15);
   --color-gray-bg-medium: rgba(107, 114, 128, 0.3);
@@ -200,7 +215,7 @@
   --code-comment: #6A9955;
   --code-number: #098658;
   --code-text: #383838;
-  --code-inline-color: #1F2328;
+  --code-inline-color: #0969DA;
   --code-inline-bg: #EFF1F3;
   --code-error: #CF222E;
   /* Purple */
@@ -225,6 +240,21 @@
   --color-code-orange-border: rgba(149, 56, 0, 0.2);
   --color-code-orange-bg: rgba(149, 56, 0, 0.06);
   --bg-container-alt: #F5F5F5;
+  /* Model avatar */
+  --bg-model-avatar: #e8e8e8;
+  /* Input bar / sticky */
+  --bg-input-bar: #ffffff;
+  --bg-sticky-btn: rgba(255, 255, 255, 0.85);
+  --chat-boxer-gradient-dir: to bottom;
+  --chat-boxer-bg-from: #F7F7F7;
+  --chat-boxer-bg-to: #F0F0F0;
+  --chat-boxer-hover-from: #EEEEEE;
+  --chat-boxer-hover-to: #E8E8E8;
+  /* Approval panel */
+  --shadow-approval-heavy: rgba(0, 0, 0, 0.1);
+  --shadow-approval-glow: rgba(245, 158, 11, 0.08);
+  --color-approval-border: #1f1f1f;
+  --color-approval-label: #1f1f1f;
   /* Gray / Overlay */
   --color-gray-bg-light: rgba(107, 114, 128, 0.1);
   --color-gray-bg-medium: rgba(107, 114, 128, 0.2);
@@ -343,7 +373,7 @@ body {
 
 /* chat-boxer: 气泡容器 */
 .chat-boxer {
-  background: linear-gradient(to top, var(--bg-surface), var(--border-secondary));
+  background: linear-gradient(var(--chat-boxer-gradient-dir), var(--chat-boxer-bg-from), var(--chat-boxer-bg-to));
   color: var(--text-white);
   border-radius: 6px;
   padding: 2px 10px;
@@ -352,7 +382,7 @@ body {
   box-sizing: border-box;
 }
 .chat-boxer:hover {
-  background: linear-gradient(to top, var(--border-secondary), var(--border-hover));
+  background: linear-gradient(var(--chat-boxer-gradient-dir), var(--chat-boxer-hover-from), var(--chat-boxer-hover-to));
 }
 .chat-boxer .chat-md tbody { background: var(--bg-base-pure); }
 

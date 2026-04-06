@@ -128,7 +128,7 @@ class ChatMessage extends React.Component {
   renderModelAvatar(modelInfo) {
     if (modelInfo?.svg) {
       return (
-        <div className={styles.avatar} style={{ background: modelInfo.color || '#6b21a8' }}
+        <div className={styles.avatar} style={{ background: modelInfo.color || 'var(--bg-model-avatar)' }}
           dangerouslySetInnerHTML={{ __html: modelInfo.svg }}
         />
       );
@@ -222,8 +222,8 @@ class ChatMessage extends React.Component {
       </div>
     );
 
-    const codePre = (text, color) => (
-      <pre className={styles.codePre} style={{ color: color || '#e5e7eb' }}>{text}</pre>
+    const codePre = (text) => (
+      <pre className={styles.codePre}>{text}</pre>
     );
 
     const onOpenFile = this.props.onOpenFile;
@@ -252,7 +252,7 @@ class ChatMessage extends React.Component {
               items={[{
                 key: '1',
                 label: <Text type="secondary" className={styles.bashCollapseLabel}>{t('ui.bashCommand')} ({lineCount} {t('ui.lines')})</Text>,
-                children: codePre(cmd, '#c9d1d9'),
+                children: codePre(cmd),
               }]}
               className={styles.collapseMargin}
             />
@@ -262,7 +262,7 @@ class ChatMessage extends React.Component {
 
       return box(
         <>Bash{desc ? <span className={styles.descSpan}> — {desc}</span> : ''}</>,
-        codePre(cmd, '#c9d1d9')
+        codePre(cmd)
       );
     }
 
@@ -286,7 +286,7 @@ class ChatMessage extends React.Component {
       const lines = content.split('\n');
       return box(
         <>Write: {pathTag(fp)} <span className={styles.secondarySpan}>({lines.length} lines)</span></>,
-        codePre(content, '#c9d1d9')
+        codePre(content)
       );
     }
 

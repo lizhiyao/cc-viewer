@@ -326,7 +326,7 @@ function TeamModal({ session, requests, mainAgentSessions, collapseToolResults, 
           <div className={`${styles.teamAgentCard} ${styles.teamLeadCard}`}>
             <div className={styles.teamAgentCardHeader}>
               {modelInfo?.svg
-                ? <div className={styles.teamAgentAvatar} style={{ background: modelInfo.color || '#6b21a8' }} dangerouslySetInnerHTML={{ __html: modelInfo.svg }} />
+                ? <div className={styles.teamAgentAvatar} style={{ background: modelInfo.color || 'var(--bg-model-avatar)' }} dangerouslySetInnerHTML={{ __html: modelInfo.svg }} />
                 : <img src={defaultModelAvatarUrl} className={styles.teamAgentAvatar} alt="lead" />
               }
               <div className={styles.teamAgentName}>team-lead</div>
