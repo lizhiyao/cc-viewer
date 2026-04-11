@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.142 (2026-04-12)
+
+- Feat: macOS code signing / notarization infrastructure (entitlements, notarize script, mac-sign.sh, SIGNING_GUIDE)
+- Fix: Electron process cleanup and system text filtering
+
 ## 1.6.141 (2026-04-12)
 
 - Feat: sidebar nav adds user avatar button with hover popover showing all user prompts for quick navigation
