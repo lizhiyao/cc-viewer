@@ -12,6 +12,8 @@ import { isMobile, isIOS } from '../env';
 import styles from './TerminalPanel.module.css';
 import { BUILTIN_PRESETS } from '../utils/builtinPresets.js';
 import { buildLocalUltraplan } from '../utils/ultraplanTemplates';
+import { getModelMaxTokens } from '../utils/helpers';
+import ConceptHelp from './ConceptHelp';
 
 const darkTerminalTheme = {
   background: '#0a0a0a', foreground: '#d4d4d4', cursor: '#0a0a0a',
@@ -906,7 +908,10 @@ class TerminalPanel extends React.Component {
     const userInput = filePaths ? (trimmed ? `${filePaths} ${trimmed}` : filePaths) : trimmed;
     const assembled = buildLocalUltraplan(userInput, this.state.ultraplanVariant);
     this.setState({ ultraplanOpen: false, ultraplanPrompt: '', ultraplanVariant: 'auto', ultraplanFiles: [] });
-    this.handlePresetSend(assembled);
+    if (assembled && this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: 'input', data: `\x1b[200~${assembled}\x1b[201~\r` }));
+    }
+    if (!isMobile && this.terminal) this.terminal.focus();
   };
 
   handleUltraplanUpload = async () => {
@@ -1064,17 +1069,20 @@ class TerminalPanel extends React.Component {
                 overlayInnerStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-hover)', borderRadius: 8, padding: 0, width: 420 }}
                 content={
                   <div className={styles.ultraplanPanel}>
-                    <div className={styles.ultraplanHeader}>{t('ui.ultraplan.title')}</div>
+                    <div className={styles.ultraplanHeader}>{t('ui.ultraplan.title')}<ConceptHelp doc="UltraPlan" zIndex={1100} /></div>
                     <div className={styles.ultraplanVariantRow}>
-                      <span className={styles.ultraplanModeLabel}>
-                        {this.state.ultraplanVariant === 'subagents' ? t('ui.ultraplan.modeForced') : t('ui.ultraplan.modeAuto')}
-                      </span>
                       <Switch
                         size="small"
                         checked={this.state.ultraplanVariant === 'subagents'}
                         onChange={(checked) => this.setState({ ultraplanVariant: checked ? 'subagents' : 'auto' })}
                       />
+                      <span className={styles.ultraplanModeLabel}>
+                        {this.state.ultraplanVariant === 'subagents' ? t('ui.ultraplan.modeForced') : t('ui.ultraplan.modeAuto')}
+                      </span>
                     </div>
+                    {(!this.props.modelName || getModelMaxTokens(this.props.modelName) < 1000000) && (
+                      <div className={styles.ultraplanContextWarning}>{t('ui.ultraplan.contextWarning')}</div>
+                    )}
                     {this.state.ultraplanFiles.length > 0 && (
                       <div className={styles.ultraplanFileList}>
                         {this.state.ultraplanFiles.map((f, i) => {

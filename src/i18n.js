@@ -6226,6 +6226,46 @@ const i18nData = {
     "th": "เพิ่มไฟล์แนบ",
     "tr": "Ek ekle",
     "uk": "Додати вкладення"
+  },
+  "ui.ultraplan.contextWarning": {
+    "zh": "当前模型上下文窗口为 200K，很容易不够一次 UltraPlan 运行，务必在运行之前执行 /clear 命令。",
+    "en": "The current model has a 200K context window, which may not be enough for a single UltraPlan run. Make sure to run /clear before starting.",
+    "zh-TW": "目前模型的上下文窗口為 200K，可能不足以完成一次 UltraPlan 執行，請務必在執行前先執行 /clear 指令。",
+    "ko": "현재 모델의 컨텍스트 창은 200K로, 한 번의 UltraPlan 실행에 충분하지 않을 수 있습니다. 시작 전에 /clear 명령을 실행하세요.",
+    "ja": "現在のモデルのコンテキストウィンドウは200Kで、1回のUltraPlan実行には不十分な場合があります。開始前に必ず /clear コマンドを実行してください。",
+    "de": "Das aktuelle Modell hat ein 200K-Kontextfenster, das für einen einzelnen UltraPlan-Lauf möglicherweise nicht ausreicht. Führen Sie vor dem Start /clear aus.",
+    "es": "El modelo actual tiene una ventana de contexto de 200K, que puede no ser suficiente para una ejecución de UltraPlan. Asegúrese de ejecutar /clear antes de comenzar.",
+    "fr": "Le modèle actuel a une fenêtre de contexte de 200K, ce qui peut être insuffisant pour une exécution UltraPlan. Exécutez /clear avant de commencer.",
+    "it": "Il modello attuale ha una finestra di contesto di 200K, che potrebbe non essere sufficiente per un'esecuzione di UltraPlan. Eseguire /clear prima di iniziare.",
+    "da": "Den aktuelle model har et 200K kontekstvindue, hvilket muligvis ikke er nok til en enkelt UltraPlan-kørsel. Kør /clear inden start.",
+    "pl": "Bieżący model ma okno kontekstu 200K, które może nie wystarczyć na jedno uruchomienie UltraPlan. Przed rozpoczęciem wykonaj /clear.",
+    "ru": "Текущая модель имеет контекстное окно 200K, которого может не хватить для одного запуска UltraPlan. Обязательно выполните /clear перед запуском.",
+    "ar": "نافذة السياق للنموذج الحالي هي 200K، وقد لا تكفي لتشغيل UltraPlan واحد. تأكد من تنفيذ /clear قبل البدء.",
+    "no": "Gjeldende modell har et 200K kontekstvindu, som kanskje ikke er nok for én UltraPlan-kjøring. Kjør /clear før du starter.",
+    "pt-BR": "O modelo atual tem uma janela de contexto de 200K, que pode não ser suficiente para uma execução do UltraPlan. Execute /clear antes de iniciar.",
+    "th": "โมเดลปัจจุบันมีหน้าต่างบริบท 200K ซึ่งอาจไม่เพียงพอสำหรับการรัน UltraPlan ครั้งเดียว ให้รันคำสั่ง /clear ก่อนเริ่ม",
+    "tr": "Mevcut modelin 200K bağlam penceresi var ve tek bir UltraPlan çalıştırması için yeterli olmayabilir. Başlamadan önce /clear komutunu çalıştırın.",
+    "uk": "Поточна модель має контекстне вікно 200K, якого може не вистачити для одного запуску UltraPlan. Обов'язково виконайте /clear перед запуском."
+  },
+  "ui.taskNotification.result": {
+    "zh": "结果详情",
+    "en": "Result details",
+    "zh-TW": "結果詳情",
+    "ko": "결과 상세",
+    "ja": "結果の詳細",
+    "de": "Ergebnisdetails",
+    "es": "Detalles del resultado",
+    "fr": "Détails du résultat",
+    "it": "Dettagli del risultato",
+    "da": "Resultatdetaljer",
+    "pl": "Szczegóły wyniku",
+    "ru": "Подробности результата",
+    "ar": "تفاصيل النتيجة",
+    "no": "Resultatdetaljer",
+    "pt-BR": "Detalhes do resultado",
+    "th": "รายละเอียดผลลัพธ์",
+    "tr": "Sonuç detayları",
+    "uk": "Деталі результату"
   }
 };
 

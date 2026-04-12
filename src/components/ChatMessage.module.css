@@ -433,6 +433,18 @@
   text-overflow: ellipsis;
 }
 
+/* === Task Notification === */
+
+.taskNotifUsage {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-secondary);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 .sendMessageBlock {
   padding: 8px 12px;
   border-radius: 6px;

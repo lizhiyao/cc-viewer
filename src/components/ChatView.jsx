@@ -786,7 +786,7 @@ class ChatView extends React.Component {
           if (suggestionText && toolResults.length > 0) {
             // AskUserQuestion 的用户回复：跳过渲染（答案已在 assistant 侧问卷卡片上显示）
           } else {
-            const { commands, textBlocks, skillBlocks, teammateBlocks } = classifyUserContent(content);
+            const { commands, textBlocks, skillBlocks, teammateBlocks, taskNotificationBlocks } = classifyUserContent(content);
             // 渲染 slash command 作为独立用户输入
             for (let ci = 0; ci < commands.length; ci++) {
               renderedMessages.push(
@@ -824,12 +824,43 @@ class ChatView extends React.Component {
                 />
               );
             }
+            // 渲染 task-notification 块
+            for (let tni = 0; tni < taskNotificationBlocks.length; tni++) {
+              const tn = taskNotificationBlocks[tni];
+              renderedMessages.push(
+                <ChatMessage
+                  key={`${keyPrefix}-tasknotif-${mi}-${tni}`}
+                  role="task-notification"
+                  taskNotification={tn}
+                  timestamp={ts}
+                  modelInfo={modelInfo}
+                  {...viewReqProps}
+                />
+              );
+            }
           }
-        } else if (typeof content === 'string' && !isSystemText(content)) {
-          const isPlan = /Implement the following plan:/i.test(content);
-          renderedMessages.push(
-            <ChatMessage key={`${keyPrefix}-user-${mi}`} role={isPlan ? 'plan-prompt' : 'user'} text={content} timestamp={ts} userProfile={userProfile} modelInfo={modelInfo} {...viewReqProps} />
-          );
+        } else if (typeof content === 'string') {
+          // 复用 classifyUserContent 解析 task-notification（避免重复正则）
+          if (/<task-notification>/i.test(content)) {
+            const { taskNotificationBlocks: strTnBlocks } = classifyUserContent([{ type: 'text', text: content }]);
+            for (let tni = 0; tni < strTnBlocks.length; tni++) {
+              renderedMessages.push(
+                <ChatMessage
+                  key={`${keyPrefix}-tasknotif-str-${mi}-${tni}`}
+                  role="task-notification"
+                  taskNotification={strTnBlocks[tni]}
+                  timestamp={ts}
+                  modelInfo={modelInfo}
+                  {...viewReqProps}
+                />
+              );
+            }
+          } else if (!isSystemText(content)) {
+            const isPlan = /Implement the following plan:/i.test(content);
+            renderedMessages.push(
+              <ChatMessage key={`${keyPrefix}-user-${mi}`} role={isPlan ? 'plan-prompt' : 'user'} text={content} timestamp={ts} userProfile={userProfile} modelInfo={modelInfo} {...viewReqProps} />
+            );
+          }
         }
       } else if (msg.role === 'assistant') {
         // 定向传递 lastPendingAskId/PlanId：只传给包含匹配 block 的消息，避免全量 re-render
@@ -3046,6 +3077,7 @@ class ChatView extends React.Component {
                 pendingImages={this.state.pendingImages}
                 onRemovePendingImage={this._removePendingImage}
                 onClearPendingImages={this._clearPendingImages}
+                modelName={this._reqScanCache?.modelName}
                 />
               </div>
             </>

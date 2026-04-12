@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.145 (2026-04-12)
+
+- Feat: UltraPlan Route C template upgrade — webSearch pre-research, up to 5 agents, post-execution TeamCreate Code Review loop
+- Feat: UltraPlan send button now directly submits (no manual Enter needed)
+- Feat: UltraPlan (?) help icon with concept docs in 18 languages
+- Feat: context window warning in UltraPlan panel for non-1M models
+- Feat: render `<task-notification>` as structured MainAgent card (summary + collapsible result + usage stats)
+- Fix: UltraPlan panel Switch position moved before label text
+
 ## 1.6.144 (2026-04-12)
 
 - Fix: iOS Safari mobile font-size clamping — WebKit minimumLogicalFontSize (9px) broke font hierarchy under zoom:0.6; iOS now uses transform:scale(0.6) with non-virtualized rendering to bypass the clamp

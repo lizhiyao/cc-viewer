@@ -74,7 +74,8 @@ class ChatMessage extends React.Component {
       p.resultText !== n.resultText || p.toolName !== n.toolName ||
       p.onViewRequest !== n.onViewRequest || p.onOpenFile !== n.onOpenFile ||
       p.onPlanApprovalClick !== n.onPlanApprovalClick || p.onPlanFeedbackSubmit !== n.onPlanFeedbackSubmit ||
-      p.onDangerousApprovalClick !== n.onDangerousApprovalClick || p.onAskQuestionSubmit !== n.onAskQuestionSubmit;
+      p.onDangerousApprovalClick !== n.onDangerousApprovalClick || p.onAskQuestionSubmit !== n.onAskQuestionSubmit ||
+      p.taskNotification?.taskId !== n.taskNotification?.taskId;
   }
 
   componentDidUpdate(prevProps) {
@@ -1073,12 +1074,64 @@ class ChatMessage extends React.Component {
     );
   }
 
+  renderTaskNotification() {
+    const { taskNotification: tn, modelInfo } = this.props;
+    if (!tn) return null;
+    const isError = tn.status === 'error';
+    const statusIcon = isError ? '✗' : '✓';
+    const statusColor = isError ? '#ff4d4f' : '#52c41a';
+
+    const durationSec = tn.usage?.durationMs ? (tn.usage.durationMs / 1000).toFixed(1) : null;
+    const tokens = tn.usage?.totalTokens ? tn.usage.totalTokens.toLocaleString() : null;
+    const toolUses = tn.usage?.toolUses || null;
+
+    const innerContent = [];
+    // summary 作为标准文本
+    innerContent.push(
+      <div key="summary" className="chat-boxer">
+        <span style={{ color: statusColor, fontWeight: 'bold', marginRight: 6 }}>{statusIcon}</span>
+        {tn.summary || 'Background Task'}
+      </div>
+    );
+    // result 折叠展开
+    if (tn.result) {
+      innerContent.push(
+        <Collapse key="result" ghost size="small" items={[{
+          key: '1',
+          label: <Typography.Text type="secondary">{t('ui.taskNotification.result') || 'Result'}</Typography.Text>,
+          children: <div className="chat-md" dangerouslySetInnerHTML={{ __html: renderMarkdown(tn.result) }} />,
+        }]} />
+      );
+    }
+    // usage 统计行
+    if (durationSec || tokens || toolUses) {
+      innerContent.push(
+        <div key="usage" className={styles.taskNotifUsage}>
+          {durationSec && <span>{durationSec}s</span>}
+          {tokens && <span>{tokens} tokens</span>}
+          {toolUses && <span>{toolUses} tool uses</span>}
+        </div>
+      );
+    }
+
+    return (
+      <div className={styles.messageRow}>
+        {this.renderModelAvatar(modelInfo)}
+        <div className={styles.contentCol}>
+          {this.renderLabel(modelInfo?.name || 'MainAgent')}
+          {this.renderHighlightBubble(styles.bubbleAssistant, innerContent)}
+        </div>
+      </div>
+    );
+  }
+
   render() {
     const { role } = this.props;
     if (role === 'user') return this.renderUserMessage();
     if (role === 'skill-loaded') return this.renderSkillLoadedMessage();
     if (role === 'plan-prompt') return this.renderPlanPromptMessage();
     if (role === 'assistant') return this.renderAssistantMessage();
+    if (role === 'task-notification') return this.renderTaskNotification();
     if (role === 'teammate-message') return this.renderTeammateMessage();
     if (role === 'teammate-status') return this.renderTeammateStatus();
     if (role === 'sub-agent-chat') return this.renderSubAgentChatMessage();

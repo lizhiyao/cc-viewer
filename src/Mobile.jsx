@@ -212,6 +212,10 @@ class Mobile extends AppBase {
     }
 
     const mobileIsLocalLog = !!this._isLocalLog;
+    let mobileModelName = null;
+    for (let i = filteredRequests.length - 1; i >= 0; i--) {
+      if (isMainAgent(filteredRequests[i]) && filteredRequests[i].body?.model) { mobileModelName = filteredRequests[i].body.model; break; }
+    }
 
     return (
       <div className={styles.mobileCLIRoot} ref={this._layoutRef}>
@@ -362,7 +366,7 @@ class Mobile extends AppBase {
           )}
           {!mobileIsLocalLog && (
             <div className={`${styles.mobileChatOverlay} ${this.state.mobileTerminalVisible ? styles.mobileChatOverlayVisible : ''}`}>
-              <TerminalPanel />
+              <TerminalPanel modelName={mobileModelName} />
             </div>
           )}
           <div className={`${styles.mobileGitDiffOverlay} ${this.state.mobileGitDiffVisible ? styles.mobileGitDiffOverlayVisible : ''}`}>
