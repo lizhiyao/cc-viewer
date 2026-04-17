@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.163 (2026-04-18)
+
+- Fix: proxy-prefixed Claude-compatible endpoints now captured in logger mode — `lib/interceptor-core.js::isAnthropicApiPath` removes the leading `^` anchor from the `/v1/messages` regex so paths like `/proxy/group_xxx:8100/v1/messages` match. Trailing `$` kept to still reject invalid suffixes (e.g. `/v1/messages/unknown`); `/api/eval/sdk-` anchor left untouched. Adds 2 test cases for proxy-prefixed URLs
+
 ## 1.6.162 (2026-04-17)
 
 - Perf: SSE smooth sticky follow — `ChatView.jsx` replaces per-chunk instant `scrollTop = scrollHeight` with rAF easeOut loop (each frame consumes ~35% of gap, clamped 1~120px); eliminates visible viewport jump on newline, dramatically smoother typewriter effect
