@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, mkdtempSync, rmSync, chmodSync, symlinkSync } from 'node:fs';
-import { buildShellCandidates, getGlobalNodeModulesDir, findPackagedBinary } from '../findcc.js';
+import { buildShellCandidates, getGlobalNodeModulesDir, findPackagedBinary, findPlatformBinary, detectPlatformKey } from '../findcc.js';
 
 // Test resolveLogDir by spawning a subprocess with different CCV_LOG_DIR values.
 // This avoids module cache busting which dilutes coverage.
@@ -139,9 +139,10 @@ describe('findcc: findPackagedBinary', () => {
   });
 });
 
-// Subprocess helper: run resolveNativePath() with a controlled PATH.
-// The shim dir has a `claude` symlink to `realTarget`; the subprocess
-// has only shimDir:/usr/bin:/bin on its PATH.
+// Subprocess helper: run resolveNativePath() with a controlled PATH and an
+// NPM_CONFIG_PREFIX pointing at a nonexistent location so the platform-binary
+// lookup (step 1 of resolveNativePath) misses and execution falls through to
+// the which/command -v path (step 2), which is what these tests exercise.
 function runResolveNativePath({ shimDir, realTarget }) {
   return execFileSync(process.execPath, [
     '--input-type=module',
@@ -150,10 +151,80 @@ function runResolveNativePath({ shimDir, realTarget }) {
   ], {
     cwd: join(import.meta.dirname, '..'),
     encoding: 'utf-8',
-    env: { PATH: `${shimDir}:/usr/bin:/bin`, HOME: '/nonexistent-home-for-test' },
+    env: {
+      PATH: `${shimDir}:/usr/bin:/bin`,
+      HOME: '/nonexistent-home-for-test',
+      NPM_CONFIG_PREFIX: '/tmp/findcc-test-fake-prefix-' + Date.now(),
+    },
     timeout: 5000,
   });
 }
+
+describe('findcc: detectPlatformKey', () => {
+  it('returns a known platform key for the current platform', () => {
+    const key = detectPlatformKey();
+    if (process.platform === 'darwin') {
+      assert.match(key, /^darwin-(arm64|x64)$/);
+    } else if (process.platform === 'linux') {
+      assert.match(key, /^linux-(x64|arm64)(-musl)?$/);
+    } else if (process.platform === 'win32') {
+      assert.match(key, /^win32-(x64|arm64)$/);
+    } else {
+      // Unsupported platform — key may be null
+      assert.ok(key === null || typeof key === 'string');
+    }
+  });
+});
+
+describe('findcc: findPlatformBinary', () => {
+  it('returns null for null/empty root', () => {
+    assert.equal(findPlatformBinary(null), null);
+    assert.equal(findPlatformBinary(''), null);
+  });
+
+  it('returns null when platform-specific package does not exist', () => {
+    const root = mkdtempSync(join(tmpdir(), 'findcc-plat-missing-'));
+    try {
+      assert.equal(findPlatformBinary(root), null);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('finds binary in the flat (hoisted) optional-dep layout', () => {
+    const key = detectPlatformKey();
+    if (!key) return;
+    const root = mkdtempSync(join(tmpdir(), 'findcc-plat-flat-'));
+    try {
+      const pkgDir = join(root, `@anthropic-ai/claude-code-${key}`);
+      mkdirSync(pkgDir, { recursive: true });
+      const binName = process.platform === 'win32' ? 'claude.exe' : 'claude';
+      const binPath = join(pkgDir, binName);
+      writeFileSync(binPath, '#!/bin/sh\nexit 0\n');
+      chmodSync(binPath, 0o755);
+      assert.equal(findPlatformBinary(root), binPath);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('finds binary in the nested (per-package) optional-dep layout', () => {
+    const key = detectPlatformKey();
+    if (!key) return;
+    const root = mkdtempSync(join(tmpdir(), 'findcc-plat-nested-'));
+    try {
+      const pkgDir = join(root, '@anthropic-ai', 'claude-code', 'node_modules', `@anthropic-ai/claude-code-${key}`);
+      mkdirSync(pkgDir, { recursive: true });
+      const binName = process.platform === 'win32' ? 'claude.exe' : 'claude';
+      const binPath = join(pkgDir, binName);
+      writeFileSync(binPath, '#!/bin/sh\nexit 0\n');
+      chmodSync(binPath, 0o755);
+      assert.equal(findPlatformBinary(root), binPath);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('findcc: resolveNativePath rejection rules (the actual bug fix)', () => {
   it('ACCEPTS a non-.js binary whose realpath is under node_modules (Claude Code 2.x layout)', () => {
