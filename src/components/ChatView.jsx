@@ -23,6 +23,7 @@ import RoleFilterBar from './RoleFilterBar';
 import ChatInputBar from './ChatInputBar';
 import PresetModal from './PresetModal';
 import UltraPlanModal from './UltraPlanModal';
+import CustomUltraplanEditModal from './CustomUltraplanEditModal';
 import { buildLocalUltraplan } from '../utils/ultraplanTemplates';
 import { getModelMaxTokens } from '../utils/helpers';
 import { Virtuoso } from 'react-virtuoso';
@@ -135,6 +136,9 @@ class ChatView extends React.Component {
       ultraplanVariant: 'codeExpert',
       ultraplanPrompt: '',
       ultraplanFiles: [],
+      customUltraplanExperts: [],
+      customUltraplanEditOpen: false,
+      customUltraplanEditing: null,
     };
     this._processedToolIds = new Set();
     this._projectDirCache = null; // 缓存项目目录绝对路径
@@ -1402,7 +1406,15 @@ class ChatView extends React.Component {
           if (dismissed.has(bp.builtinId) || existingBuiltinIds.has(bp.builtinId)) continue;
           items.unshift({ id: Date.now() + Math.random(), builtinId: bp.builtinId, teamName: bp.teamName, description: bp.description });
         }
-        this.setState({ presetItems: items });
+        const customExperts = Array.isArray(data.customUltraplanExperts) ? data.customUltraplanExperts : [];
+        // 若当前选中的自定义专家已不存在（被另一端删除），回退到 codeExpert
+        const current = this.state.ultraplanVariant;
+        const next = { presetItems: items, customUltraplanExperts: customExperts };
+        if (typeof current === 'string' && current.startsWith('custom:')) {
+          const id = current.slice('custom:'.length);
+          if (!customExperts.some(e => e.id === id)) next.ultraplanVariant = 'codeExpert';
+        }
+        this.setState(next);
       }).catch(() => {});
     });
   }
@@ -1424,7 +1436,16 @@ class ChatView extends React.Component {
     if (!trimmed && this.state.ultraplanFiles.length === 0) return;
     const filePaths = this.state.ultraplanFiles.map(f => `"${f.path}"`).join(' ');
     const userInput = filePaths ? (trimmed ? `${filePaths} ${trimmed}` : filePaths) : trimmed;
-    const assembled = buildLocalUltraplan(userInput, this.state.ultraplanVariant);
+    const variant = this.state.ultraplanVariant;
+    let assembled;
+    if (typeof variant === 'string' && variant.startsWith('custom:')) {
+      const id = variant.slice('custom:'.length);
+      const item = this.state.customUltraplanExperts.find(e => e.id === id);
+      if (!item) return;
+      assembled = buildLocalUltraplan(userInput, 'custom', undefined, item.content);
+    } else {
+      assembled = buildLocalUltraplan(userInput, variant);
+    }
     if (!assembled) return;
 
     // 复用对话输入框的发送方式：写入 textarea → 触发 handleInputSend
@@ -1485,6 +1506,45 @@ class ChatView extends React.Component {
     this.setState(prev => ({
       ultraplanFiles: prev.ultraplanFiles.filter((_, i) => i !== idx),
     }));
+  };
+
+  _openCustomUltraplanEditor = (item) => {
+    this.setState({ customUltraplanEditOpen: true, customUltraplanEditing: item || null });
+  };
+
+  _closeCustomUltraplanEditor = () => {
+    this.setState({ customUltraplanEditOpen: false, customUltraplanEditing: null });
+  };
+
+  _persistCustomUltraplanExperts = (experts) => {
+    this.setState({ customUltraplanExperts: experts });
+    fetch(apiUrl('/api/preferences'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customUltraplanExperts: experts }),
+    })
+      .then(() => window.dispatchEvent(new Event('ccv-presets-changed')))
+      .catch(() => {});
+  };
+
+  _saveCustomUltraplanExpert = (item) => {
+    const existing = this.state.customUltraplanExperts;
+    const idx = existing.findIndex(e => e.id === item.id);
+    const next = idx >= 0
+      ? existing.map(e => (e.id === item.id ? item : e))
+      : [...existing, item];
+    this._persistCustomUltraplanExperts(next);
+    this._closeCustomUltraplanEditor();
+  };
+
+  _deleteCustomUltraplanExpert = (id) => {
+    const next = this.state.customUltraplanExperts.filter(e => e.id !== id);
+    this._persistCustomUltraplanExperts(next);
+    // 如果当前选中的就是被删的，回退到 codeExpert
+    if (this.state.ultraplanVariant === 'custom:' + id) {
+      this.setState({ ultraplanVariant: 'codeExpert' });
+    }
+    this._closeCustomUltraplanEditor();
   };
 
   connectInputWs() {
@@ -3294,6 +3354,7 @@ class ChatView extends React.Component {
               files={this.state.ultraplanFiles}
               modelName={this._reqScanCache?.modelName}
               agentTeamEnabled={this.state.agentTeamEnabled}
+              customExperts={this.state.customUltraplanExperts}
               onClose={() => this.setState({ ultraplanModalOpen: false })}
               onVariantChange={(v) => this.setState({ ultraplanVariant: v })}
               onPromptChange={(t) => this.setState({ ultraplanPrompt: t })}
@@ -3301,6 +3362,14 @@ class ChatView extends React.Component {
               onUpload={this._handleUltraplanUpload}
               onPaste={this._handleUltraplanPaste}
               onRemoveFile={this._handleUltraplanRemoveFile}
+              onOpenCustomEditor={this._openCustomUltraplanEditor}
+            />
+            <CustomUltraplanEditModal
+              open={this.state.customUltraplanEditOpen}
+              initial={this.state.customUltraplanEditing}
+              onSave={this._saveCustomUltraplanExpert}
+              onDelete={this._deleteCustomUltraplanExpert}
+              onClose={this._closeCustomUltraplanEditor}
             />
             </div>
           </div>

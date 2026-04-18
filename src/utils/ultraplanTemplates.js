@@ -87,16 +87,38 @@ Your final plan must include the following elements:
 };
 
 /**
+ * Wrap user-authored custom instruction body with the same scoped-instruction
+ * preamble used by the built-in variants. Produces a full <system-reminder>
+ * block ready to be inlined into a Claude Code prompt.
+ */
+export function buildCustomTemplate(content) {
+  const body = (content || '').trim();
+  if (!body) return '';
+  return `<system-reminder>
+[SCOPED INSTRUCTION] The following instructions are intended for the next 1–3 interactions. Once the task is complete, these instructions should be gradually deprioritized and no longer influence subsequent interactions.
+
+${body}
+</system-reminder>`;
+}
+
+/**
  * Assemble a local ultraplan prompt.
  * Mirrors ~/claude-code/commands/ultraplan.tsx:63-73 buildUltraplanPrompt()
  *
  * @param {string} userPrompt - User's task description
- * @param {'codeExpert'|'researchExpert'} variant - Template variant
+ * @param {'codeExpert'|'researchExpert'|'custom'} variant - Template variant
  * @param {string} [seedPlan] - Optional draft plan to refine
+ * @param {string} [customContent] - Required when variant === 'custom': the user-authored body
  * @returns {string} Assembled prompt ready to send to Claude Code
  */
-export function buildLocalUltraplan(userPrompt, variant = 'codeExpert', seedPlan) {
-  const template = ULTRAPLAN_VARIANTS[variant] || ULTRAPLAN_VARIANTS.codeExpert;
+export function buildLocalUltraplan(userPrompt, variant = 'codeExpert', seedPlan, customContent) {
+  let template;
+  if (variant === 'custom') {
+    template = buildCustomTemplate(customContent);
+    if (!template) return '';
+  } else {
+    template = ULTRAPLAN_VARIANTS[variant] || ULTRAPLAN_VARIANTS.codeExpert;
+  }
   const parts = [];
   if (seedPlan) {
     parts.push('Here is a draft plan to refine:', '', seedPlan, '');

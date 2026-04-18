@@ -5,24 +5,38 @@ import { getModelMaxTokens } from '../utils/helpers';
 import styles from './UltraPlanModal.module.css';
 
 export default function UltraPlanModal({
-  open, variant, prompt, files, modelName, agentTeamEnabled,
-  onClose, onVariantChange, onPromptChange, onSend, onUpload, onPaste, onRemoveFile,
+  open, variant, prompt, files, modelName, agentTeamEnabled, customExperts,
+  onClose, onVariantChange, onPromptChange, onSend, onUpload, onPaste, onRemoveFile, onOpenCustomEditor,
 }) {
   if (!open) return null;
 
   const hasContent = (prompt || '').trim() || files.length > 0;
   const lowContext = !modelName || getModelMaxTokens(modelName) < 1000000;
+  const experts = Array.isArray(customExperts) ? customExperts : [];
 
   return (
     <div className={styles.backdrop} onClick={onClose}>
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.header}>
           <span className={styles.title}>{t('ui.ultraplan.title')}</span>
-          <button className={styles.closeBtn} onClick={onClose}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+          <div className={styles.headerActions}>
+            {onOpenCustomEditor && agentTeamEnabled && (
+              <button
+                className={styles.headerIconBtn}
+                onClick={() => onOpenCustomEditor(null)}
+                title={t('ui.ultraplan.customAdd')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <circle cx="12" cy="12" r="9" /><path d="M12 7v10M7 12h10" />
+                </svg>
+              </button>
+            )}
+            <button className={styles.closeBtn} onClick={onClose}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {!agentTeamEnabled ? (
@@ -44,6 +58,30 @@ export default function UltraPlanModal({
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 {t('ui.ultraplan.roleResearchExpert')}
               </button>
+              {experts.map(item => {
+                const vkey = 'custom:' + item.id;
+                return (
+                  <span key={item.id} className={styles.customWrap}>
+                    <button
+                      className={`${styles.roleBtn} ${variant === vkey ? styles.roleBtnActive : ''}`}
+                      onClick={() => onVariantChange(vkey)}
+                      title={item.title}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>
+                      <span className={styles.customTitle}>{item.title}</span>
+                    </button>
+                    {onOpenCustomEditor && (
+                      <span
+                        className={styles.editPencil}
+                        onClick={(e) => { e.stopPropagation(); onOpenCustomEditor(item); }}
+                        title={t('ui.ultraplan.customEditTitle')}
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+                      </span>
+                    )}
+                  </span>
+                );
+              })}
             </div>
 
             {lowContext && (

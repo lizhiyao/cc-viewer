@@ -51,6 +51,74 @@
   color: var(--text-secondary);
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.headerIconBtn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+
+.headerIconBtn:hover {
+  background: var(--bg-surface);
+  color: var(--color-primary);
+}
+
+.customWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.customTitle {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editPencil {
+  position: absolute;
+  top: -4px;
+  inset-inline-end: -4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.customWrap:hover .editPencil {
+  opacity: 1;
+}
+
+.editPencil:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+@media (max-width: 768px) {
+  .editPencil { opacity: 1; }
+}
+
 .disabledTip {
   padding: 16px;
   font-size: 13px;

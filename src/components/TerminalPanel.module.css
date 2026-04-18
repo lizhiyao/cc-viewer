@@ -461,6 +461,79 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ultraplanHeaderTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ultraplanHeaderAddBtn {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  padding: 0;
+}
+
+.ultraplanHeaderAddBtn:hover {
+  background: var(--bg-surface);
+  color: var(--color-primary);
+}
+
+.ultraplanCustomWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ultraplanCustomTitle {
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ultraplanEditPencil {
+  position: absolute;
+  top: -4px;
+  inset-inline-end: -4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.ultraplanCustomWrap:hover .ultraplanEditPencil {
+  opacity: 1;
+}
+
+.ultraplanEditPencil:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+@media (max-width: 768px) {
+  .ultraplanEditPencil { opacity: 1; }
 }
 
 .ultraplanVariantRow {
