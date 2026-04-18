@@ -41,7 +41,7 @@ import { checkAndUpdate } from './lib/updater.js';
 import { loadPlugins, runWaterfallHook, runParallelHook, getPluginsInfo, getPluginsDir } from './lib/plugin-loader.js';
 import { uploadPlugins, installPluginFromUrl } from './lib/plugin-manager.js';
 import { getUserProfile } from './lib/user-profile.js';
-import { getGitDiffs } from './lib/git-diff.js';
+import { getGitDiffs, countUntrackedLines } from './lib/git-diff.js';
 import { CONTEXT_WINDOW_FILE, readModelContextSize, buildContextWindowEvent, getContextSizeForModel } from './lib/context-watcher.js';
 import { watchLogFile, startWatching, getWatchedFiles, sendEventToClients, sendToClients } from './lib/log-watcher.js';
 import { isMainAgentEntry, extractCachedContent } from './lib/kv-cache-analyzer.js';
@@ -2301,7 +2301,9 @@ async function handleRequest(req, res) {
         return { status, file };
       });
 
-      // Collect per-file insertions/deletions via git diff --numstat (tracked) + --cached --numstat (staged)
+      // Collect per-file insertions/deletions via git diff --numstat (tracked) + --cached --numstat (staged).
+      // Neither covers untracked files, so add their line counts separately via countUntrackedLines
+      // — matching git's numstat semantics (binary and >5MB files contribute 0).
       let insertions = 0, deletions = 0;
       try {
         const [{ stdout: numstat }, { stdout: cachedNumstat }] = await Promise.all([
@@ -2315,6 +2317,17 @@ async function handleRequest(req, res) {
           }
         }
       } catch { /* non-critical — stats just stay 0 */ }
+
+      // Cap untracked-file processing to keep the event loop responsive if a
+      // repo forgets to gitignore a huge directory (e.g. node_modules).
+      const MAX_UNTRACKED = 1000;
+      let untrackedProcessed = 0;
+      for (const c of changes) {
+        if (c.status !== '??') continue;
+        if (untrackedProcessed >= MAX_UNTRACKED) break;
+        insertions += countUntrackedLines(cwd, c.file);
+        untrackedProcessed++;
+      }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ changes, insertions, deletions }));

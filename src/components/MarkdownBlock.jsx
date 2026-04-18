@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { Tooltip, message } from 'antd';
 import { CopyOutlined, DownloadOutlined, CameraOutlined, SaveOutlined } from '@ant-design/icons';
 import { renderMarkdown } from '../utils/markdown';
+import { recordMountSample, DEV_PROFILER_ENABLED } from '../utils/markdownProfiler';
 import { apiUrl } from '../utils/apiUrl';
 import { isMobile, isPad } from '../env';
 import { t } from '../i18n';
@@ -13,11 +14,23 @@ function MarkdownBlock({ text, className, style, trailingCursor }) {
   const timerRef = useRef(null);
   const wrapRef = useRef(null);
   const savingRef = useRef(false);
+  const mountStartRef = useRef(0);
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
-
   const html = useMemo(() => text ? renderMarkdown(text) : '', [text]);
+
+  // Dev-only mount profiling: start AFTER useMemo so `md-parse` time (measured
+  // separately inside renderMarkdown) is not double-counted in `md-mount`.
+  // Ref-based — a discarded render under React concurrent mode simply gets
+  // overwritten by the next render's timestamp, no pending-Map leak.
+  if (DEV_PROFILER_ENABLED) mountStartRef.current = performance.now();
+  useEffect(() => {
+    if (DEV_PROFILER_ENABLED && mountStartRef.current > 0) {
+      recordMountSample(performance.now() - mountStartRef.current);
+      mountStartRef.current = 0;
+    }
+  });
 
   if (!text) return null;
 
