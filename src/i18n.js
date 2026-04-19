@@ -4356,26 +4356,6 @@ const i18nData = {
     "tr": "Gönder",
     "uk": "Надіслати"
   },
-  "ui.chatInput.hintMobile": {
-    "zh": "如果遇到流程阻塞，切换到[终端]模式审批权限",
-    "en": "If blocked, switch to [Terminal] mode to approve permissions",
-    "zh-TW": "如果遇到流程阻塞，切換到[終端]模式審批權限",
-    "ko": "프로세스가 차단되면 [터미널] 모드로 전환하여 권한을 승인하세요",
-    "ja": "プロセスがブロックされた場合、[ターミナル]モードに切り替えて権限を承認してください",
-    "de": "Bei Blockierung zum [Terminal]-Modus wechseln, um Berechtigungen zu genehmigen",
-    "es": "Si se bloquea, cambie al modo [Terminal] para aprobar permisos",
-    "fr": "En cas de blocage, passez en mode [Terminal] pour approuver les autorisations",
-    "it": "In caso di blocco, passa alla modalità [Terminale] per approvare i permessi",
-    "da": "Hvis blokeret, skift til [Terminal]-tilstand for at godkende tilladelser",
-    "pl": "W przypadku blokady przełącz na tryb [Terminal], aby zatwierdzić uprawnienia",
-    "ru": "При блокировке переключитесь в режим [Терминал] для одобрения разрешений",
-    "ar": "إذا تم الحظر، قم بالتبديل إلى وضع [الطرفية] للموافقة على الأذونات",
-    "no": "Hvis blokkert, bytt til [Terminal]-modus for å godkjenne tillatelser",
-    "pt-BR": "Se bloqueado, mude para o modo [Terminal] para aprovar permissões",
-    "th": "หากถูกบล็อก ให้สลับไปโหมด [เทอร์มินัล] เพื่ออนุมัติสิทธิ์",
-    "tr": "Engellendiyse, izinleri onaylamak için [Terminal] moduna geçin",
-    "uk": "При блокуванні перейдіть у режим [Термінал] для затвердження дозволів"
-  },
   "ui.chatInput.hintEnter": {
     "zh": "Enter 发送，Shift+Enter 换行",
     "en": "Enter to send, Shift+Enter for new line",

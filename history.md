@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.6.176 (2026-04-20)
+
+- Fix (iOS permission panel coordinate — follow-up to 1.6.174): the 1.6.174 fix used `window.innerHeight - rect.top` to compute the panel's bottom offset, on the assumption that `interactive-widget=resizes-content` would shrink `window.innerHeight` when the keyboard opened. That meta attribute is **Chrome-only** (WebKit/iOS ignores it — confirmed via the bramus/viewport-resize-behavior explainer); on iOS Safari `window.innerHeight` reports the layout viewport and stays constant when the keyboard appears. Net effect: with keyboard open on iOS, `rect.top` moves up (element pushed by shrunk visual viewport) but `innerHeight` doesn't → `distFromBottom` inflates → the approval panel floats far above the input bar or off-screen. Fix at `src/components/ChatInputBar.jsx:55`: use `window.visualViewport?.height ?? window.innerHeight` as the viewport-height source — `visualViewport.height` is the spec-correct visual viewport value, shrinks with the keyboard on both iOS and Android, and falls back to `innerHeight` on environments without the API (very old browsers; shipped in Safari since 13). `rect.top` and `visualViewport.height` are in the same coordinate system (both in visual-viewport pixels, post-transform/zoom), so the subtraction is dimensionally consistent
+- Fix (iOS momentum-scroll jitter on approval panel): removed the `visualViewport.scroll` listener added in 1.6.174. On iOS during momentum scroll, `scroll` fires at ~60Hz and `rect.top` fluctuates as the visual viewport moves over the layout viewport → the panel `bottom` recomputed every frame → panel step-jitters up and down during the fling. Only `resize` is kept (for keyboard open/close) + `ResizeObserver` (for input-bar growth from multi-line/pending-images) + `window.resize` (for orientation/window size). `position: fixed` already pins the panel visually during scroll — no need to manually track scroll position
+- Fix (CustomUltraplanEditModal ConceptHelp stacking): follow-up to 1.6.175. The edit modal's inline `<ConceptHelp doc="CustomUltraplanExpert" zIndex={1100} />` at `src/components/CustomUltraplanEditModal.jsx:58` had `zIndex={1100}`, inherited from before 1.6.175 bumped the parent Modal to 1200. Since ConceptHelp is itself an antd Modal rendered through a portal (no ancestor stacking context saves it), the 1100 help popup rendered **underneath** the 1200 parent → clicking `?` opened invisible content. Bumped to `zIndex={1300}`. Other ConceptHelp callsites (`AppHeader`, `FileExplorer`, `TeamSessionPanel`, `TerminalPanel`) are top-level and unaffected
+- Fix (UltraPlan restore-on-close fragility): 1.6.175 hard-coded `ultraplanModalOpen: true` / `ultraplanOpen: true` on `_closeCustomUltraplanEditor` / `closeCustomUltraplanEditor`. Safe today (all callers originate inside UltraPlan) but a hidden coupling: any future non-UltraPlan callsite (settings, keyboard shortcut) would spuriously pop UltraPlan on close. Fix at `ChatView.jsx::_openCustomUltraplanEditor`/`_closeCustomUltraplanEditor` and `TerminalPanel.jsx::openCustomUltraplanEditor`/`closeCustomUltraplanEditor`: snapshot `prev.ultraplanModalOpen` (or `prev.ultraplanOpen`) into a transient `_ultraplanWasOpenBeforeEdit` state field at open-edit time; restore from that field at close-edit time and clear it. `setState` now uses the updater form to guarantee reads of the prior value are not stale under concurrent setState
+- Docs (history.md): restored 1.5.7 reference to the Pre-1.6 summary — the 1.5.x subsection's "iOS 专项" bullet now lists `(1.5.7/17)` with a short note on "虚拟按键栏 touchstart preventDefault + 按键后 blur，消除按键误触发虚拟键盘". The prior compression had omitted 1.5.7 entirely
+
+## 1.6.175 (2026-04-20)
+
+- Fix (mobile custom-expert editor z-index / stacking regression): on mobile, opening "新建自定义专家" from within UltraPlan showed TWO full-screen modals stacked — worse, in the wrong order: the UltraPlan modal (white, frontmost) visually sat on top of the CustomUltraplanEditModal (gray, behind), so the expert-creation form was partially hidden by the very modal that spawned it. Root cause is a mismatched z-index convention: `UltraPlanModal`'s custom `.backdrop` hardcodes `z-index: 1100` at `src/components/UltraPlanModal.module.css:4` (originally sized to sit above the ConceptHelp popover and app chrome), while `CustomUltraplanEditModal` uses antd's `<Modal>` which defaults to `zIndex: 1000`. When CustomUltraplanEditModal opened, its own 1000 mask and content rendered *underneath* UltraPlan's 1100 backdrop — the screenshot's "gray behind, white in front" stacking was exactly this z-order. Secondary UX issue: even with z-index fixed, two full-screen modals stacked on a 375px phone is visually overloaded — the backdrops double-darken the page and the user has to mentally track which modal owns the close button. Fix in three parts: (1) `CustomUltraplanEditModal.jsx:65` adds `zIndex={1200}` to the antd Modal — explicitly above UltraPlan's 1100 backdrop AND above antd Popover's default 1030 (TerminalPanel's desktop path uses a Popover, not a Modal, so this also fixes the PC case where the edit modal sat behind the Popover). 1200 is a conservative bump; the ConceptHelp `<ConceptHelp doc="CustomUltraplanExpert" zIndex={1100} />` inside the same modal at `CustomUltraplanEditModal.jsx:58` does NOT collide because ConceptHelp's 1100 is scoped to its *own* popover relative to its trigger, not the modal itself — and antd portals each modal's overlay into a separate stacking context rooted at document.body. (2) `ChatView.jsx:1549-1563` `_openCustomUltraplanEditor` now also sets `ultraplanModalOpen: false` — the parent UltraPlan is hidden the moment the editor opens, so mobile users see one modal at a time. `_closeCustomUltraplanEditor` sets it back to `true`, restoring UltraPlan after save/cancel/delete so the user sees their new/edited/deleted expert reflected in the variant row. `_saveCustomUltraplanExpert` and `_deleteCustomUltraplanExpert` route through `_closeCustomUltraplanEditor` unchanged, so the restore fires on all three exit paths. This is safe because the only caller of `_openCustomUltraplanEditor` in ChatView is UltraPlanModal's "+" and pencil buttons (confirmed via grep) — so `ultraplanModalOpen` is guaranteed to have been `true` when the editor opens, and the restore is the correct continuation. (3) Same pattern in `TerminalPanel.jsx:941-958` for the desktop Popover flow: `openCustomUltraplanEditor` toggles `ultraplanOpen: false` (collapses the Popover), `closeCustomUltraplanEditor` toggles it back to `true` — user clicks `+`, Popover dismisses, edit modal appears alone, save/cancel closes the modal and Popover re-opens with the updated list. No third callsite exists, so the always-restore behavior is correct everywhere. Net effect: on mobile the stacking is gone (one modal at a time, correct visual hierarchy), and on desktop the edit modal always sits above both the UltraPlan modal's custom z-index and the antd Popover default
+
+## 1.6.174 (2026-04-20)
+
+- Fix (mobile permission panel intermittently covering the input bar): the symptom — sometimes the `ToolApprovalPanel` (`.panelGlobal` on mobile) would sit on top of the input bar's top portion, then "jump up" to the correct position a frame later. Root cause is a **coordinate-space mismatch**: `.mobileChatInner` applies `zoom: 0.6` (non-iOS) or `transform: scale(0.6)` (iOS branch at `src/App.module.css:381`) so the input bar visually shrinks to 60%, but `.panelGlobal` is rendered **outside** `mobileCLIBody` (to keep `position: fixed` usable — the transform on its parent would otherwise trap it) and uses **viewport pixels**. The old code at `ChatInputBar.jsx:47` wrote `el.offsetHeight` into `--chat-input-bar-height`, which on iOS is the **layout height (pre-scale)** — e.g. a 300px layout input bar with pending images reads as 300 but only occupies 180px visually on screen; the panel at `bottom: 300+12=312px` would have been above the input's visual top (180px) so it would have had a *gap*, not covered — but combined with the `140px` fallback (used until ResizeObserver's first callback fires), when the input was multi-line/had images and RO had not yet run, the panel would be at `140+12=152px` while the visual input top was at 180px → 28px of overlap. Users saw this as "sometimes covers briefly, then snaps". Secondary contributor: iOS virtual keyboard moving the layout viewport bottom without any signal to recompute. Fix in four parts: (1) at `src/components/ChatInputBar.jsx:52-56` the measurement switches from `offsetHeight` to `el.getBoundingClientRect()` — `rect.top` is in **visual viewport coordinates** (post-transform/post-zoom), and we publish `window.innerHeight - rect.top` which is semantically "distance from input-bar top to viewport bottom" — exactly the value `.panelGlobal { bottom: calc(var(--chat-input-bar-height) + 12px) }` wants to consume, in the right unit. Same math works uniformly in pad-mode (no scale, equals layout height), phone `zoom: 0.6`, and iOS `transform: scale`. (2) hook swapped from `useEffect` → `useLayoutEffect` — it fires synchronously after DOM commit but **before paint**, so `setVar()` writes the CSS variable on the same frame the panel is mounted, eliminating the old RO-race first-frame mispaint. (3) cleanup no longer calls `removeProperty('--chat-input-bar-height')` — on unmount the last known value is retained, so brief remount windows (session switch, etc.) don't fall back to the CSS fallback and cause a flicker. (4) added `window.visualViewport.addEventListener('resize' & 'scroll', setVar)` — on iOS with `interactive-widget=resizes-content` (already set in `index.html` per 1.5.17), the layout viewport shrinks when the keyboard opens, and `visualViewport` is the spec-correct event source to observe that; both `resize` (keyboard open/close) and `scroll` (page-level scroll on iOS that shifts `position: fixed`) trigger a recompute, so the panel glides with the keyboard instead of being partially occluded behind it. Also added `window.resize` listener as a pad-mode safety net (no visualViewport on some desktop paths but orientation change still matters). Companion CSS tweak at `src/components/ToolApprovalPanel.module.css:24-26`: the fallback bumps `140px → 200px` (200 is a conservative upper bound for phone zoom-0.6 multi-line + pending-image input visual height) and the comment is rewritten to reflect the new semantics — the variable is no longer "input bar height" but "distance from input top to viewport bottom", which is what the panel actually needs. In the rare path where the CSS var isn't yet written (before first layoutEffect, or in a non-ChatInputBar view that somehow triggers a global permission), the larger fallback ensures the panel errs on the side of "gap above input" rather than "covers input top" — gap is visually tolerable, overlap is not
+
+## 1.6.173 (2026-04-20)
+
+- UX (mobile phone context health bar): `Mobile.jsx` previously gated the context-usage health bar behind `isPad && !mobileIsLocalLog`, so real phones (`isMobile && !isPad`) fell through to the `<Badge status="processing"> + <span>` text-only branch and didn't visualize context usage. The gate is now `!mobileIsLocalLog` — phones render the same `.mobileCtxTag` blood bar as iPad/narrow-PC with identical logic (color thresholds 60%/80% warning/error, `_lastContextPercent` hysteresis, `contextWindow.used_percentage / 83.5 * 100` normalization). The else branch now only handles the `mobileIsLocalLog` case (the `mobileIsLocalLog ? historyLog : liveMonitoring` ternary inside was dead code after the gate flipped). Full label `"Live Monitoring: <project>"` is preserved per user preference (answered in AskUserQuestion) — not shortened. Overflow handling: the label is hoisted to a `ctxLabel` const and passed both as `<span>`'s inner text AND as the outer `<span title={ctxLabel}>`, so long project names truncate to ellipsis via existing `.mobileCtxTagContent { overflow: hidden; text-overflow: ellipsis }` but the full name is available via hover tooltip (desktop narrow) or long-press (iOS/Android accessibility). CSS additions in `App.module.css`: `.mobileCLIHeaderLeft` gains `min-width: 0; flex: 1 1 auto` so the left half of the header can shrink below its content's intrinsic width when the right half's buttons (`Git diff` / `CLI`) get long, and `.mobileCtxTag` gains `min-width: 0; flex: 0 1 auto` to actually honor that parent shrink (without `min-width: 0` on a flex child, the browser refuses to shrink below content width). The existing `max-width: 200px` cap is retained so the tag never grows past 200px even when the right half is empty
+- Cleanup (drop mobile "switch to [Terminal] to approve" hint in chat input): `ChatInputBar.jsx` was showing `ui.chatInput.hintMobile` ("如果遇到流程阻塞，切换到[终端]模式审批权限") to the right of the textarea on phones (`isMobile && !isPad`) via a dedicated `styles.chatInputHintMobile` class. User requested removal. Mobile branch now renders `null` inside the hint div (the `flex: 1` wrapper stays to preserve the spacer between the `+` / mic buttons and the send button). The unused `.chatInputHintMobile` CSS rule is deleted from `ChatInputBar.module.css` (6 lines), and the `ui.chatInput.hintMobile` i18n key with its 18 translations is deleted from `src/i18n.js` (20 lines). Desktop/pad continue to show `hintEnter` ("Enter 发送，Shift+Enter 换行") or `hintTab` ("Tab 接受建议") unchanged
+
 ## 1.6.172 (2026-04-20)
 
 - UX (permission approval panel no longer covers typed text): the `ToolApprovalPanel` approval dialog used to anchor to the bottom of the viewport (`bottom: 60px` on desktop, `bottom: 16px` on mobile/pad) — shorter than the actual `ChatInputBar`, so it would float on top of whatever the user was mid-typing. Fix: on desktop+iPad (local-render path via ChatView), wrap both `<ToolApprovalPanel>` instances and `<ChatInputBar>` in a new `.inputStack { position: relative; flex-shrink: 0 }` container, and switch the panel to `position: absolute; bottom: 100%; margin-bottom: 8px` — the panel's bottom edge now anchors to the input bar's top edge regardless of how tall the input bar grows (multi-line, pasted images, etc.). On mobile (global-render path via `Mobile.jsx`, rendered outside `mobileCLIBody` to avoid transform affecting fixed positioning — so it can't be wrapped in `.inputStack`), `ChatInputBar` now publishes its own `offsetHeight` to a `--chat-input-bar-height` CSS custom property on `document.documentElement` via a `ResizeObserver`; `.panelGlobal` uses `bottom: calc(var(--chat-input-bar-height, 140px) + 12px)` to track the input bar dynamically. The 140px fallback matches the mobile single-line minimum (10+16 padding + 52px textarea + ~38px bottom button row + border). Cleanup on unmount disconnects the observer and removes the property. Pad mode's `:global(html.pad-mode) .panel` stopped setting `position: fixed` — it now inherits the base `position: absolute; bottom: 100%` and the `.inputStack` wrapper, keeping the same anchor behavior as desktop. Media query for `max-width: 768px` similarly dropped its `position: fixed; bottom: 16px`, keeping only horizontal padding. Net effect: the panel always appears immediately above the input bar, never covers the cursor or typed text, works identically across desktop / iPad / mobile
@@ -1114,293 +1135,30 @@
 - Fix: removed `watchContextWindow` file polling — eliminates cross-process data pollution from teammates/other projects
 - Docs: updated KVCacheContent concept docs across all 17 language versions
 
-## 1.5.45 (2026-03-17)
-
-- Fix: KV-Cache user prompt navigation — added SVG marching-ants dashed border animation on highlighted cache blocks (matching ChatMessage style)
-- Fix: highlight timing — detect actual scroll completion via `scrollend` event + 500ms minimum delay, so animation appears after scroll settles instead of during
-- Feature: raw mode cross-navigation — clicking user prompt nav in header popover now selects the MainAgent request, switches to KV-Cache-Text tab, and scrolls to the message with animation in DetailPanel
-- Fix: DetailPanel performance — added `componentWillUnmount` timer cleanup, limited highlight state re-renders to kv-cache-text tab only, clear timers on request switch
-- i18n: added `ui.userPromptNav` entries for all 18 supported languages, changed `ui.tokens` zh/zh-TW from "令牌" to "Token"
-
-## 1.5.43 (2026-03-17)
-
-- Fix: AskUserQuestion multi-question submit — replaced stale React state closure check with synchronous instance variable (`_currentPtyPrompt`) for reliable prompt detection across sequential question submissions
-
-## 1.5.42 (2026-03-17)
-
-- Feature: ultrathink button in PC terminal toolbar — writes `ultrathink ` command into terminal input without auto-submitting
-- i18n: added `ui.terminal.ultrathink` entries for all 18 supported languages
-
-## 1.5.41 (2026-03-17)
-
-- Fix: AskUserQuestion single-select radio now clickable — replaced antd Radio.Group with custom div-based radio implementation
-- Fix: AskUserQuestion interactive card renders in streaming "Last Response" — passes askAnswerMap, lastPendingAskId, onAskQuestionSubmit props
-- Fix: CLI pre-answer detection — componentDidUpdate watches askAnswerMap changes to auto-replace interactive card with static answered card
-- Fix: submit works without ptyPrompt — falls back to assuming first option selected (CLI default) when terminal prompt not detected
-- Fix: mobile AskUserQuestion interactive — lazy WebSocket connect on submit, uses onAskQuestionSubmit gate instead of cliMode
-
-## 1.5.40 (2026-03-16)
-
-- Feature: log preview Popover — hover (desktop) or click (mobile) to see all user prompts in a floating panel
-- Feature: mobile log table — timestamp hides year, shows `MM-DD HH:mm:ss` format
-- Fix: preview column text overflow — maxWidth 600px with ellipsis for long prompts
-- Fix: stats-worker prompt extraction rewritten to align with App.jsx/contentFilter.js logic (isSystemText, stripSystemTags, extractUserTexts)
-- Fix: preview dedup — file-level Set dedup removes duplicate prompt text within same log file
-- Fix: stats-worker STATS_VERSION 6→8, forces cache invalidation for re-parsing
-
-## 1.5.39 (2026-03-16)
-
-- Feature: AskUserQuestion interactive UI — pending questions render Radio/Checkbox controls with submit button in chat panel (single-select, multi-select, Other with text input, markdown preview layout)
-- Fix: statusLine non-exclusive — no longer modifies user's `statusLine` in settings.json; context window data is now extracted from API response usage in the interceptor
-- Fix: ExitPlanMode approval buttons now render immediately without waiting for PTY prompt detection; uses built-in default options as fallback
-- i18n: added askSubmit, askSubmitting, askOther, askOtherPlaceholder entries for all 18 supported languages
-
-## 1.5.37 (2026-03-16)
-
-- Feature: plan approval UI — ExitPlanMode cards show approve/reject/feedback buttons with status badges; only the last pending card is interactive
-- Feature: log table preview column — shows first user prompt from each conversation
-- Feature: `/api/refresh-stats` endpoint — force re-scan all project stats with 30s timeout
-- Feature: refresh stats button in import modal
-- Fix: preview collection in stats-worker always-true condition — same-turn duplicate requests no longer produce duplicate previews
-- Fix: plan feedback submission replaced fixed 300ms delay with polling (100ms intervals, max 2s) for reliable CLI mode detection
-- i18n: added plan approval and refresh stats entries for all supported languages
-
-## 1.5.34 (2026-03-15)
-
-- Fix: chat panel repeatedly refreshing after restart — `watchLogFile()` now initializes `lastSize` to current file size instead of 0, preventing duplicate broadcast of historical entries already sent via `/events` load flow
-
-## 1.5.32 (2026-03-14)
-
-- Refactor: move proxy-errors.js and proxy-env.js into lib/ directory
-- Fix: skip redundant interceptor setup when CCV_PROXY_MODE is set (prevents duplicate fetch patching in Claude subprocess)
-- Chore: remove stale `locales/` entry from package.json files array
-
-## 1.5.31 (2026-03-14)
-
-- Feature: terminal toolbar with file upload button (PC only) — uploads file to server, writes quoted path to terminal/textarea
-- Feature: upload button in chatInputBar when terminal is hidden
-- Fix: SSE real-time updates broken after client disconnect (clients array reference was replaced instead of mutated in-place)
-- Improve: upload API uses `apiUrl()` for token auth compatibility with LAN/QR access
-- Improve: 50MB upload size limit enforced on both client and server
-- Improve: unique filenames with timestamp suffix to prevent silent overwrite
-- Add: test/upload-api.test.js (7 test cases)
-
-## 1.5.30 (2026-03-14)
-
-- Fix: QR code popover hardcoded 800px width — now auto-fits content
-
-## 1.5.29 (2026-03-14)
-
-- Feature: auto-refresh FileExplorer and GitChanges panels when Claude uses file-mutating tools (Write, Edit, Bash, NotebookEdit)
-- Improve: footer bar top border for visual consistency with other toolbars
-- Improve: unit test coverage from 68.98% → 71.23% line, 69.17% → 72.81% branch
-- Add: test/git-diff.test.js, test/log-watcher.test.js, test/findcc.test.js, test/context-watcher.test.js
-- Add: `npm run test:coverage` script for branch coverage reporting
-- Improve: supplemented branch tests for proxy-errors, updater, stats-worker
-
-## 1.5.27 (2026-03-13)
-
-- Remove: inflight request detection and display (spinner, tooltip, popover) — feature no longer functional
-- Fix: folder/git-changes sidebar buttons now toggle instead of always-open, and no longer close the file detail panel
-- Fix: hardcoded `http://` protocol in process management port links and server URL parsing — now inherits from browser/server protocol
-
-## 1.5.26 (2026-03-13)
-
-- Feature: "当前项目" tag replaced with context usage health bar — shows real-time context window consumption with color transitions (green → yellow → red)
-- Feature: statusLine integration — auto-installs wrapper script to capture `context_window.used_percentage` from Claude Code, pushed to frontend via SSE
-- Feature: `getModelMaxTokens()` helper for model context window size mapping (Claude 200k, GPT-4o 128k, DeepSeek 128k, etc.)
-- Fix: statusLine lifecycle — proper install/uninstall with original config preservation, cleanup on abnormal exit
-- Fix: `ccv -uninstall` now cleans up statusLine config, ccv-statusline.sh script, and context-window.json
-- Fix: `removeShellHook` now scans all shell config files (.zshrc, .zprofile, .bashrc, .bash_profile, .profile)
-
-## 1.5.25 (2026-03-13)
-
-- Feature: inject Claude process PID (`entry.pid`) into `onNewEntry` plugin hook — CLI mode uses PTY child PID, hook-injection mode uses `process.pid`
-- Add: `getPtyPid()` export in pty-manager.js
-- Improve: Context tab sidebar now supports keyboard navigation across visible items, including system prompt, history toggle, history turns, current turn, and tool entries
-- Improve: Context sidebar interactive rows now use focusable controls with visible keyboard focus styling
-- Note: auto-selecting the latest turn when `body/response` changes remains unchanged for now
-
-## 1.5.24 (2026-03-13)
-
-- Feature: "当前项目" tag replaced with context usage health bar — shows real-time context window consumption with color transitions (green → yellow → red)
-- Feature: statusLine integration — auto-installs wrapper script to capture `context_window.used_percentage` from Claude Code, pushed to frontend via SSE
-- Feature: `getModelMaxTokens()` helper for model context window size mapping (Claude 200k, GPT-4o 128k, DeepSeek 128k, etc.)
-- Fix: statusLine lifecycle — proper install/uninstall with original config preservation, cleanup on abnormal exit
-- Fix: `ccv -uninstall` now cleans up statusLine config, ccv-statusline.sh script, and context-window.json
-- Fix: `removeShellHook` now scans all shell config files (.zshrc, .zprofile, .bashrc, .bash_profile, .profile)
-
-## 1.5.23 (2026-03-13)
-
-- Fix: `claude -v` / `claude --version` / `claude -h` no longer triggers ccv startup — passthrough flags now work correctly
-- Fix: `installShellHook` now compares hook content instead of just mode, so outdated hooks are automatically replaced on `ccv -logger`
-
-## 1.5.22 (2026-03-13)
-
-- Feature: click file path in GitDiffView to open FileContentView and scroll to first changed line
-- Fix: untracked files in Git Changes now show green "U" instead of raw "??"
-- Enhancement: CodeMirror Find/Replace panel styled to match antd5 dark theme (no gradient, proper input/button sizing)
-- Update: editor session banner text — clearer "click to return to Terminal" wording
-
-## 1.5.21 (2026-03-13)
-
-- Refactor: replace hardcoded HTTPS cert with plugin hook `httpsOptions` (waterfall)
-- Enhancement: `serverStarted` hook now receives `{ port, host, url, ip, token }` (added `url`, `ip`, `token`)
-- Fix: `/api/local-url` now respects actual server protocol (HTTP/HTTPS) instead of hardcoded `http://`
-- Enhancement: AskUserQuestion renders selected answers with green checkmark SVG directly on assistant-side card
-- Remove: separate user-selection bubble for AskUserQuestion (merged into assistant card)
-- Fix: AskUserQuestion answer parsing — use regex instead of broken JSON.parse for `"q"="a"` format
-- Enhancement: minimap overlay contrast and activeLine highlight improved
-
-## 1.5.20 (2026-03-12)
-
-- Fix: `proxy-errors.js` missing from npm package, causing `ERR_MODULE_NOT_FOUND` when running `ccv -logger`
-
-## 1.5.19 (2026-03-12)
-
-- Refactor: ccv argument passthrough — ccv is now a drop-in replacement for claude, all args passed through directly
-- Remove: `-c`/`-d` flags as ccv-specific options (now passed through to claude as `--continue`/`--debug`)
-- Add: `ccv -logger` command for hook installation (replaces bare `ccv`)
-- Add: `--d` shortcut for `--dangerously-skip-permissions`
-- Update: help text (`ccv -h`) now shows both ccv-specific and claude passthrough options
-- Update: all 18 language README files to reflect new command format
-
-## 1.5.18 (2026-03-11)
-
-- Improve: compact JSON log format — remove pretty-print indentation to reduce log file size
-- Improve: reduce MAX_LOG_SIZE from 200MB to 150MB
-- Improve: add 300MB total size limit for log merge API
-
-## 1.5.17 (2026-03-11)
-
-- Fix: iOS terminal severe lag — skip WebGL renderer on iOS, fall back to Canvas rendering
-- Fix: iOS keyboard pushes navigation bar out of viewport — use `visualViewport` API with fixed positioning to lock layout within visible area
-- Improve: reduce terminal scrollback for better mobile performance (iOS: 200, Android: 1000, Desktop: 3000)
-- Add `isIOS` device detection in env.js
-- Add `interactive-widget=resizes-content` to viewport meta tag
-
-## 1.5.16 (2026-03-11)
-
-- Fix: single-line selection invisible in FileContentView editor — `.cm-activeLine` solid background occluded CodeMirror selection layer; changed to semi-transparent `rgba(255, 255, 255, 0.06)`
-
-## 1.5.15 (2026-03-11)
-
-- Fix: multi-line paste in terminal triggers auto-submit — intercept paste events with bracketed paste escape sequences (`\x1b[200~`...`\x1b[201~`) to prevent newlines from being treated as Enter
-- Improve: skip bracketed paste wrapping when shell has already enabled bracketedPasteMode via `\x1b[?2004h`
-
-## 1.5.14 (2026-03-11)
-
-- Feat: built-in $EDITOR/$VISUAL intercept — Claude Code editor requests open in FileContentView, save and close to continue
-- Feat: editor session management — server-side editorSessions Map with WebSocket broadcast for open/done events
-- Improve: pty-manager passes serverPort, injects CCV_EDITOR_PORT env for ccv-editor.js script
-- Improve: TerminalPanel handles editor-open messages, ChatView/FileContentView support editor session banner
-- i18n: add ui.editorSession.banner across all 18 supported languages
-
-## 1.5.12 (2026-03-10)
-
-- Feat: CCV process management — list all CCV instances (port 7008-7099), view PID/port/command/start time, stop idle processes from UI
-- Feat: process management API — GET /api/ccv-processes (discover via lsof, filter child processes) and POST /api/ccv-processes/kill (with safety checks)
-- Improve: shell hook passthrough — non-interactive commands (--version, --help, plugin, mcp, etc.) bypass CCV interception entirely
-- Improve: interceptor skip — non-interactive arguments skip interceptor setup and server startup for faster CLI responses
-- Improve: PTY manager — switch to --settings JSON injection for ANTHROPIC_BASE_URL to reliably override settings.json config
-- Fix: Modal.confirm dark theme — add global CSS overrides for antd confirm dialogs (background, text, button colors)
-- Fix: DetailPanel reminder select — reduce CSS specificity from !important to doubled selector for cleaner overrides
-- Fix: FileContentView minimap gutter — add padding-top alignment for line number column
-- i18n: add ui.processManagement.* keys (12 entries) across all 18 supported languages
-
-## 1.5.11 (2026-03-10)
-
-- Feat: migrate FileContentView from highlight.js to CodeMirror 6 — full-featured code editor with syntax highlighting, editing, and save support
-- Feat: add CodeMirror minimap extension — provides code overview with optimized settings (characters display, mouse-over overlay)
-- Feat: file editing and saving — Ctrl+S hotkey support, auto-save status indicator, POST /api/file-content endpoint
-- Improve: custom line number gutter — external line numbers with scroll sync, allowing minimap to display properly
-- i18n: add ui.save, ui.saving, ui.saved, ui.saveFailed, ui.unsavedChanges across all 17 languages
-
-## 1.5.10 (2026-03-09)
-
-- Feat: mobile user prompt viewer — add "用户Prompt" menu item in mobile hamburger menu, fully aligned with PC's original mode implementation
-- Feat: complete prompt extraction logic — replicate AppHeader's parseSegments, extractUserTexts, and extractUserPrompts methods for mobile
-- Feat: export prompts to .txt — mobile version supports exporting user prompts with timestamps
-- Improve: mobile chat list limit adjusted from 300 to 240 items for better performance
-
-## 1.5.9 (2026-03-09)
-
-- Fix: DiffView restructured from single table to fixed gutter + scrollable code layout — line numbers and +/- prefix no longer shift on mobile horizontal scroll
-- Fix: DiffView code background colors (red/green) now extend to full row width — fills viewport when code is short, follows longest line when code overflows
-
-## 1.5.8 (2026-03-09)
-
-- Feat: mobile chat list performance optimization — limit rendering to last 300 items with "load more" button (loads 100 at a time), prevents UI lag with 500+ messages
-- Feat: incremental SSE loading — client sends cached metadata (since/cc) to server, receives only delta entries instead of full reload
-- Feat: auto-collapse long bash commands — bash commands with more than 5 lines are automatically collapsed in chat view to improve readability
-- Improve: silent incremental updates — no loading overlay when cache exists, seamless merge of new data
-- Improve: mobile "stick to bottom" button — 2x larger size (120px height, 24px font) for better touch targets
-- i18n: add "ui.loadMoreHistory" with {count} placeholder across 17 languages
-- i18n: add "ui.bashCommand" and "ui.lines" for bash command collapse feature
-
-## 1.5.7 (2026-03-09)
-
-- Fix: mobile virtual keyboard no longer pops up when pressing virtual keys (arrows, enter, etc.) — uses preventDefault on touchstart and blur after key send, while preserving normal text input focus
-
-## 1.5.6 (2026-03-09)
-
-- Fix: hide QR code entry in history log mode on PC
-- Fix: DiffView toggle button (expand/collapse) no longer wraps on narrow screens
-- Improve: DiffView code area supports unified horizontal scrolling — line numbers and +/- prefix columns use `position: sticky` with opaque backgrounds to stay fixed while code scrolls
-
-## 1.5.5 (2026-03-09)
-
-- Feat: download log file — new download button per log entry, streams raw JSONL via `/api/download-log`
-- Feat: delete logs — bulk delete selected logs with confirmation dialog via `/api/delete-logs`
-- Feat: log list upgraded from List to Table component with sortable columns (time, turns, size, actions)
-- Feat: mobile display settings — collapseToolResults and expandThinking switches now accessible from mobile menu
-- Improve: mobile log management — converted from Modal to left-slide-in panel, consistent with stats overlay
-- Improve: mobile button styling — inactive buttons use gray outline, merge=blue/delete=red when active
-- Fix: ConceptHelp modal — use ConfigProvider darkAlgorithm instead of manual color hacks; fixes black title and misaligned close button on mobile
-- Fix: ConceptHelp horizontal scrollbar on mobile — add box-sizing:border-box to textarea/pre, overflow-x:hidden to modalBody
-- Fix: PC log modal double scroll — changed Modal body to overflow:hidden to avoid conflict with Table scroll
-- i18n: added downloadLog, deleteLogs, deleteLogsConfirm, deleteSuccess, deleteFailed, cancel, logTime, logSize, logTurns, logActions across all 18 languages
-
-## 1.5.4 (2026-03-09)
-
-- Fix: proxy stream error handler — add persistent error listener to prevent late-arriving errors from crashing the process
-- Fix: outputBuffer safe truncation — skip incomplete ANSI escape sequences when slicing to prevent terminal state corruption on WebSocket replay
-- Fix: local log file mode — pass access token when opening log files in new window; hide terminal button and show chat overlay for local log viewing on mobile
-- Fix: ConceptHelp modal header and close button color set to white for better visibility
-- Perf: ConceptHelp mobile responsive styles — adjusted font sizes for headings, code blocks, and textareas on small screens
-- Perf: Terminal rendering optimization — add smoothScrollDuration:0 and scrollOnUserInput:true; chunk large writes (>32KB) across animation frames to prevent main thread blocking during /resume
-
-## 1.5.3 (2026-03-08)
-
-- Fix: Chat View Edit diff line numbers now correctly reflect file position by tracking Read results and Edit mutations via editSnapshotMap
-- Fix: Read tool result `cat -n` format parsing — separator is `→` (Unicode 8594), not tab
-- Fix: Git Diff minimap visibility race condition — use rAF polling to detect scrollHeight changes after content renders
-- Fix: Git Diff minimap markers use CSS percentage positioning instead of pixel-based mapHeight to avoid zero-height state
-- Improve: Chat View DiffView line number column width dynamically adjusts based on max line number
-
-## 1.5.2 (2026-03-08)
-
-- Fix: ConceptHelp modal dark theme — title, text, headings, code, links and close button now use light colors on dark background for mobile readability
-
-## 1.5.1 (2026-03-08)
-
-- Perf: reduce JSONL log rotation threshold from 300MB to 200MB
-- Refactor: remove Body Diff JSON tooltip popup, keep diff functionality intact
-- Perf: incremental SSE loading — client sends last timestamp and cached count, server returns only new entries
-
-## 1.5.0 (2026-03-08)
-
-- Feat: mobile IndexedDB entry cache — first load caches all entries, subsequent visits restore instantly from cache before SSE arrives
-- Perf: singleton IndexedDB connection with write deduplication to avoid redundant structured clone on frequent SSE updates
-- Feat: 7-day automatic cache expiry with cleanup on read
-- Feat: mobile stats panel (MobileStats component)
-
 ---
 
-## Pre-1.5 版本汇总 (Pre-1.5 Version Summary)
+## Pre-1.6 版本汇总 (Pre-1.6 Version Summary)
 
-> 以下为 1.5.0 之前所有版本的功能摘要，详细变更记录已归档。
-> Below is a condensed summary of all versions prior to 1.5.0.
+> 以下为 1.6.0 之前所有版本的功能摘要，详细变更记录已归档。
+> Below is a condensed summary of all versions prior to 1.6.0.
+
+### 1.5.x (2026-03-08 ~ 2026-03-17) — 上下文血条、CodeMirror 编辑器、交互式审批
+
+- 上下文血条：「当前项目」tag 替换为 context usage 血条（绿/黄/红），statusLine wrapper 脚本捕获 `used_percentage` 推送 SSE；`getModelMaxTokens()` 模型上下文窗口映射；KV-Cache user prompt 点击跳转 + `scrollend` 动画时机 (1.5.24/26/45)
+- AskUserQuestion 交互式：聊天面板内渲染 Radio/Checkbox + 提交按钮，支持单选/多选/Other 自定义输入/Markdown preview；已回答自动切换静态卡片；多问题串行 PTY 提交 (1.5.21/39/41/43)
+- Plan approval UI：ExitPlanMode 卡片审批/拒绝/反馈按钮，内置默认选项 fallback 无需等 PTY 侦测 (1.5.37/39)
+- CodeMirror 6 编辑器：FileContentView 从 highlight.js 迁移到 CodeMirror，支持编辑保存（Ctrl+S + `/api/file-content`）、minimap、自定义 gutter；GitDiff 点击路径跳转对应行 (1.5.3/11/16/22)
+- `$EDITOR` / `$VISUAL` 拦截：Claude 编辑请求在 FileContentView 打开，保存关闭继续；服务端 editorSessions Map + WebSocket 广播 (1.5.14)
+- CCV 进程管理：列出 7008-7099 端口所有实例，PID/port/命令/启动时间展示，UI 停止闲置进程；`GET /api/ccv-processes` + `POST /kill` 带安全校验 (1.5.12)
+- CLI 透传改造：`ccv` 成为 claude drop-in 替换，参数直传；`ccv -logger` 独立安装 hook；`-v/-h/--version/--help` 绕过 hook；`--d` = `--dangerously-skip-permissions`；注入 Claude PID 到 `onNewEntry` (1.5.19/23/25)
+- 移动端性能与体验：IndexedDB 本地缓存 + 7 天过期；消息列表分页 (末尾 240/300 + load more)；SSE 增量加载 (`since/cc` metadata) ；User Prompt 查看器 + 导出；长 bash 自动折叠；stick-to-bottom 按钮 2x 尺寸；display 设置进 mobile menu (1.5.0/5/8/10)
+- iOS 专项：终端从 WebGL 降级 Canvas 解决严重卡顿；`visualViewport` + fixed positioning 修复键盘顶起导航栏；`interactive-widget=resizes-content` viewport meta；scrollback iOS=200 / Android=1000 / Desktop=3000；虚拟按键栏 touchstart preventDefault + 按键后 blur，消除按键误触发虚拟键盘 (1.5.7/17)
+- Terminal 增强：文件上传按钮（PC 工具栏 + chat input）50MB 限制 + 唯一文件名；bracketed paste (`\x1b[200~`) 阻止多行粘贴误触发 submit；`ultrathink` 按钮；大写入分 32KB 跨帧避免主线程阻塞；outputBuffer ANSI 安全截断 (1.5.4/15/31/42)
+- Log 管理：下载/批量删除日志（`/api/download-log`、`/api/delete-logs`）；Log 列表 List→Table 可排序；JSONL 紧凑格式 + MAX_LOG_SIZE 200MB→150MB + 合并 API 300MB 上限；Preview 列 Popover（hover/click）带 stats-worker v6→v8 缓存失效 (1.5.1/5/18/37/40)
+- Git/File 联动：Claude 写操作后（Write/Edit/Bash/NotebookEdit）自动刷新 FileExplorer 和 GitChanges；Git U 状态绿标替换 `??`；侧边栏文件夹/Git 按钮改 toggle (1.5.22/27/29)
+- 插件 API：`httpsOptions` hook (waterfall) 替换硬编码 HTTPS cert；`serverStarted` hook 新增 `url/ip/token`；`/api/local-url` 尊重实际协议；`proxy-errors.js` / `proxy-env.js` 移入 lib/ (1.5.21/32)
+- 修复与回归：`watchLogFile()` 初始化 `lastSize` 修复重启重复广播；`proxy-errors.js` 补进 npm files array；`installShellHook` 内容比对替换过期 hook；SSE clients 数组 mutate-in-place 修复断连后失联；`claude -v/-h` 正确透传；QR popover 自适应宽度；DiffView 固定 gutter + 背景全宽；ConceptHelp dark-theme 修复 (1.5.2/6/9/20/30/34)
+- 测试与覆盖率：覆盖率 line 68.98%→71.23%、branch 69.17%→72.81%；新增 `test/git-diff / log-watcher / findcc / context-watcher / upload-api / proxy-errors / updater / stats-worker` 系列单测；`npm run test:coverage` 脚本 (1.5.29/31)
 
 ### 1.4.x (2026-03-02 ~ 2026-03-07) — CLI 模式与终端集成
 

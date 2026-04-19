@@ -1547,11 +1547,23 @@ class ChatView extends React.Component {
   };
 
   _openCustomUltraplanEditor = (item) => {
-    this.setState({ customUltraplanEditOpen: true, customUltraplanEditing: item || null });
+    // 打开专家编辑器时关闭父 UltraPlan 弹窗，避免两层 modal 在移动端叠加遮挡。
+    // 用快照记录原本的打开状态，close 时按实际状态恢复——防御未来非 UltraPlan 路径调用。
+    this.setState(prev => ({
+      customUltraplanEditOpen: true,
+      customUltraplanEditing: item || null,
+      _ultraplanWasOpenBeforeEdit: prev.ultraplanModalOpen,
+      ultraplanModalOpen: false,
+    }));
   };
 
   _closeCustomUltraplanEditor = () => {
-    this.setState({ customUltraplanEditOpen: false, customUltraplanEditing: null });
+    this.setState(prev => ({
+      customUltraplanEditOpen: false,
+      customUltraplanEditing: null,
+      ultraplanModalOpen: !!prev._ultraplanWasOpenBeforeEdit,
+      _ultraplanWasOpenBeforeEdit: false,
+    }));
   };
 
   _persistCustomUltraplanExperts = (experts) => {

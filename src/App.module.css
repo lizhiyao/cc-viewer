@@ -745,6 +745,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .mobileCLIStatusLabel {
@@ -768,6 +770,8 @@
   white-space: nowrap;
   background: var(--bg-base-pure);
   max-width: 200px;
+  min-width: 0;
+  flex: 0 1 auto;
 }
 
 .mobileCtxTagFill {

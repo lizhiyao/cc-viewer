@@ -19,11 +19,13 @@
 
 .panelGlobal {
   /* 移动端在 mobileCLIBody 之外渲染（避免 transform 影响 fixed），无法嵌入 .inputStack。
-     由 ChatInputBar 通过 ResizeObserver 写入 --chat-input-bar-height（含 padding+border），
-     这里 bottom = 输入栏实际高度 + 12px 视觉间隙；多行输入时自动跟随，单行时紧贴。
-     fallback 140px 对应 mobile 最小单行输入栏高度。 */
+     ChatInputBar 用 getBoundingClientRect 算出"输入栏顶部到视口底部的距离"（含
+     mobileChatInner 的 zoom/scale 效果），写入 --chat-input-bar-height；useLayoutEffect
+     同步首次写入 + 监听 visualViewport resize（iOS 键盘）。这里 bottom = 该距离 + 12px 间隙。
+     fallback 200px 是 zoom:0.6 下多行+pending图片时输入栏视觉高度的安全上限，保证即使
+     CSS 变量还没来得及写也绝不覆盖输入栏（宁可留大间隙也不遮挡）。 */
   position: fixed;
-  bottom: calc(var(--chat-input-bar-height, 140px) + 12px);
+  bottom: calc(var(--chat-input-bar-height, 200px) + 12px);
   left: 10px;
   right: 10px;
   z-index: 99999;

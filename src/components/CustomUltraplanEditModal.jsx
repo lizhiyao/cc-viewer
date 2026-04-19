@@ -55,13 +55,14 @@ export default function CustomUltraplanEditModal({ open, initial, onSave, onDele
       title={
         <span className={styles.titleRow}>
           {isEdit ? t('ui.ultraplan.customEditTitle') : t('ui.ultraplan.customCreateTitle')}
-          <ConceptHelp doc="CustomUltraplanExpert" zIndex={1100} />
+          <ConceptHelp doc="CustomUltraplanExpert" zIndex={1300} />
         </span>
       }
       open={open}
       onCancel={onClose}
       footer={footer}
       width={600}
+      zIndex={1200}
       destroyOnClose
       styles={{ content: { background: 'var(--bg-elevated)', border: '1px solid var(--border-light)' }, header: { background: 'var(--bg-elevated)', borderBottom: 'none' } }}
     >

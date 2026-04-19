@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { uploadFileAndGetPath } from './TerminalPanel';
 import { apiUrl } from '../utils/apiUrl';
 import { isMobile, isPad } from '../env';
@@ -36,20 +36,46 @@ function ChatInputBar({ inputRef, inputEmpty, inputSuggestion, terminalVisible, 
     }
   }, []);
 
-  // 把 ChatInputBar 实时高度写到 document CSS 变量 --chat-input-bar-height。
-  // 用于移动端 .panelGlobal（Mobile.jsx 全局渲染，不在 .inputStack 内）动态上浮，
-  // 避免多行输入时审批面板被输入栏覆盖。
-  useEffect(() => {
+  // 把 ChatInputBar 顶部到视口底部的距离写到 document CSS 变量 --chat-input-bar-height。
+  // 用于移动端 .panelGlobal（Mobile.jsx 全局渲染，不在 .inputStack 内）动态上浮。
+  //
+  // 必须使用 getBoundingClientRect() 而非 offsetHeight，因为 mobileChatInner 在手机端
+  // 有 zoom:0.6 / scale(0.6) 缩放，而 .panelGlobal 在缩放容器外用 viewport px 定位。
+  // getBoundingClientRect 已包含所有 transform/zoom 效果，属视口坐标。
+  //
+  // 视口高度必须用 visualViewport.height（iOS Safari 键盘开启时 window.innerHeight
+  // 不会变，interactive-widget=resizes-content 在 WebKit 不生效，只有 visualViewport
+  // 才反映真实可视区）。fallback 到 innerHeight 是为了不支持 visualViewport 的环境。
+  //
+  // useLayoutEffect 同步首次写入避免首帧竞态；只监听 visualViewport.resize（iOS 键盘升降），
+  // 不监听 scroll —— scroll 在 iOS 动量滚动期间每帧触发，会让面板随惯性抖动。
+  // unmount 时保留最后值不清除，避免卸载瞬间回退 fallback 覆盖。
+  useLayoutEffect(() => {
     const el = rootRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => {
-      // offsetHeight 包含 padding+border，准确反映输入栏在布局中占据的垂直空间
-      document.documentElement.style.setProperty('--chat-input-bar-height', el.offsetHeight + 'px');
-    });
-    ro.observe(el);
+    if (!el) return;
+    const setVar = () => {
+      const rect = el.getBoundingClientRect();
+      const vh = window.visualViewport?.height ?? window.innerHeight;
+      const distFromBottom = Math.max(0, vh - rect.top);
+      document.documentElement.style.setProperty('--chat-input-bar-height', distFromBottom + 'px');
+    };
+    setVar();
+    let ro;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(setVar);
+      ro.observe(el);
+    }
+    const vv = window.visualViewport;
+    if (vv) {
+      vv.addEventListener('resize', setVar);
+    }
+    window.addEventListener('resize', setVar);
     return () => {
-      ro.disconnect();
-      document.documentElement.style.removeProperty('--chat-input-bar-height');
+      if (ro) ro.disconnect();
+      if (vv) {
+        vv.removeEventListener('resize', setVar);
+      }
+      window.removeEventListener('resize', setVar);
     };
   }, []);
 
@@ -318,9 +344,9 @@ function ChatInputBar({ inputRef, inputEmpty, inputSuggestion, terminalVisible, 
               </svg>
             </button>
           )}
-          <div className={(isMobile && !isPad) ? styles.chatInputHintMobile : styles.chatInputHint}>
+          <div className={styles.chatInputHint}>
             {(isMobile && !isPad)
-              ? t('ui.chatInput.hintMobile')
+              ? null
               : (inputSuggestion && inputEmpty ? t('ui.chatInput.hintTab') : t('ui.chatInput.hintEnter'))}
           </div>
           <div className={styles.sendBtnWrap}>

@@ -366,8 +366,8 @@ class Mobile extends AppBase {
                 <line x1="3" y1="18" x2="21" y2="18" />
               </svg>
             </button>
-            {isPad && !mobileIsLocalLog ? (() => {
-              // iPad 模式：渲染与 PC 一致的上下文血条
+            {!mobileIsLocalLog ? (() => {
+              // 移动端（含 iPad）：渲染与 PC 一致的上下文血条
               const contextWindow = this.state.contextWindow;
               let contextPercent = 0;
               if (contextWindow?.used_percentage != null) {
@@ -387,18 +387,19 @@ class Mobile extends AppBase {
               if (contextPercent === 0 && this._lastContextPercent > 0) contextPercent = this._lastContextPercent;
               else this._lastContextPercent = contextPercent;
               const ctxColor = contextPercent >= 80 ? 'var(--color-error-light)' : contextPercent >= 60 ? 'var(--color-warning-light)' : 'var(--color-success)';
+              const ctxLabel = `${t('ui.liveMonitoring')}${this.state.projectName ? `: ${this.state.projectName}` : ''}`;
               return (
-                <span className={styles.mobileCtxTag} style={{ borderColor: ctxColor, color: ctxColor }}>
+                <span className={styles.mobileCtxTag} style={{ borderColor: ctxColor, color: ctxColor }} title={ctxLabel}>
                   <span className={styles.mobileCtxTagFill} style={{ width: `${contextPercent}%`, backgroundColor: ctxColor }} />
                   <span className={styles.mobileCtxTagContent}>
-                    {t('ui.liveMonitoring')}{this.state.projectName ? `: ${this.state.projectName}` : ''}
+                    {ctxLabel}
                   </span>
                 </span>
               );
             })() : (
               <>
                 <Badge status="processing" color="green" />
-                <span className={styles.mobileCLIStatusLabel}>{mobileIsLocalLog ? t('ui.historyLog', { file: this._localLogFile }) : (t('ui.liveMonitoring') + (this.state.projectName ? `: ${this.state.projectName}` : ''))}</span>
+                <span className={styles.mobileCLIStatusLabel}>{t('ui.historyLog', { file: this._localLogFile })}</span>
               </>
             )}
           </div>

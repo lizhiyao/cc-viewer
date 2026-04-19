@@ -939,11 +939,23 @@ class TerminalPanel extends React.Component {
   };
 
   openCustomUltraplanEditor = (item) => {
-    this.setState({ customUltraplanEditOpen: true, customUltraplanEditing: item || null });
+    // 打开专家编辑器时收起 UltraPlan Popover，避免 Popover/Modal 层级混淆。
+    // 快照原状态，close 时按实际值恢复——防御未来非 UltraPlan 路径调用。
+    this.setState(prev => ({
+      customUltraplanEditOpen: true,
+      customUltraplanEditing: item || null,
+      _ultraplanWasOpenBeforeEdit: prev.ultraplanOpen,
+      ultraplanOpen: false,
+    }));
   };
 
   closeCustomUltraplanEditor = () => {
-    this.setState({ customUltraplanEditOpen: false, customUltraplanEditing: null });
+    this.setState(prev => ({
+      customUltraplanEditOpen: false,
+      customUltraplanEditing: null,
+      ultraplanOpen: !!prev._ultraplanWasOpenBeforeEdit,
+      _ultraplanWasOpenBeforeEdit: false,
+    }));
   };
 
   persistCustomUltraplanExperts = (experts) => {
