@@ -94,6 +94,15 @@ function fixSpawnHelperPermissions() {
   } catch { }
 }
 
+// Opus 4.7 默认不再返回 thinking；为所有非显式覆写的调用加上 summarized。
+export function withDefaultThinkingDisplay(args) {
+  if (!Array.isArray(args)) return args;
+  const hasFlag = args.some(a =>
+    a === '--thinking-display' || (typeof a === 'string' && a.startsWith('--thinking-display='))
+  );
+  return hasFlag ? args : [...args, '--thinking-display', 'summarized'];
+}
+
 export async function spawnClaude(proxyPort, cwd, extraArgs = [], claudePath = null, isNpmVersion = false, serverPort = null) {
   if (ptyProcess) {
     killPty();
@@ -144,13 +153,15 @@ export async function spawnClaude(proxyPort, cwd, extraArgs = [], claudePath = n
     }
   });
 
+  const finalExtraArgs = withDefaultThinkingDisplay(extraArgs);
+
   let command = claudePath;
-  let args = ['--settings', settingsJson, ...extraArgs];
+  let args = ['--settings', settingsJson, ...finalExtraArgs];
 
   // 如果是 npm 版本（cli.js），需要使用 node 来运行
   if (isNpmVersion && claudePath.endsWith('.js')) {
     command = nodePath;
-    args = [claudePath, '--settings', settingsJson, ...extraArgs];
+    args = [claudePath, '--settings', settingsJson, ...finalExtraArgs];
   }
 
   lastExitCode = null;

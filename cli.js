@@ -274,6 +274,10 @@ async function runProxyCommand(args) {
       }
     });
 
+    // 注入默认 --thinking-display summarized（用户已显式传入则不覆盖）
+    const { withDefaultThinkingDisplay } = await import('./pty-manager.js');
+    cmdArgs = withDefaultThinkingDisplay(cmdArgs);
+
     cmdArgs.unshift(settingsJson);
     cmdArgs.unshift('--settings');
 

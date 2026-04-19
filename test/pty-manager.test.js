@@ -12,6 +12,7 @@ import {
   getPtyState,
   getCurrentWorkspace,
   getOutputBuffer,
+  withDefaultThinkingDisplay,
 } from '../pty-manager.js';
 
 // ─── getPtyPid / getPtyState / getCurrentWorkspace (no PTY running) ───
@@ -203,4 +204,53 @@ describe('pty-manager: output buffer limits', () => {
 
   // Note: Testing MAX_BUFFER truncation requires spawning PTY and generating >200KB output,
   // which is impractical for unit tests. This is better suited for integration tests.
+});
+
+// ─── withDefaultThinkingDisplay ───
+
+describe('pty-manager: withDefaultThinkingDisplay', () => {
+  it('appends --thinking-display summarized when flag is absent', () => {
+    const out = withDefaultThinkingDisplay([]);
+    assert.deepEqual(out, ['--thinking-display', 'summarized']);
+  });
+
+  it('appends at the END so existing args come first', () => {
+    const out = withDefaultThinkingDisplay(['-p', 'hello']);
+    assert.deepEqual(out, ['-p', 'hello', '--thinking-display', 'summarized']);
+  });
+
+  it('leaves args unchanged when user passed --thinking-display in space form', () => {
+    const input = ['--thinking-display', 'off', '-p', 'x'];
+    const out = withDefaultThinkingDisplay(input);
+    assert.deepEqual(out, input);
+    assert.equal(out, input, 'should return same reference to signal no-op');
+  });
+
+  it('leaves args unchanged when user passed --thinking-display in equals form', () => {
+    const input = ['--thinking-display=full', '-p', 'x'];
+    const out = withDefaultThinkingDisplay(input);
+    assert.deepEqual(out, input);
+    assert.equal(out, input);
+  });
+
+  it('does not mutate input array when appending', () => {
+    const input = ['-p', 'hello'];
+    const before = [...input];
+    withDefaultThinkingDisplay(input);
+    assert.deepEqual(input, before, 'input array must not be mutated');
+  });
+
+  it('returns non-array input unchanged (defensive)', () => {
+    assert.equal(withDefaultThinkingDisplay(null), null);
+    assert.equal(withDefaultThinkingDisplay(undefined), undefined);
+  });
+
+  it('detects the flag even mid-array (not just at start)', () => {
+    const input = ['-p', 'hello', '--thinking-display', 'summarized'];
+    const out = withDefaultThinkingDisplay(input);
+    assert.equal(out, input, 'existing flag mid-array should suppress append');
+    // And no duplicate flag appended
+    const count = out.filter(a => a === '--thinking-display').length;
+    assert.equal(count, 1);
+  });
 });
