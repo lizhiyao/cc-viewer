@@ -5,6 +5,7 @@ import { isMobile, isPad } from './env';
 import WorkspaceList from './components/WorkspaceList';
 import OpenFolderIcon from './components/OpenFolderIcon';
 import { t, getLang, setLang } from './i18n';
+import { setClaudeConfigDir } from './utils/tClaude';
 import { formatTokenCount, filterRelevantRequests, isRelevantRequest, appendCacheLossMap, extractCachedContent } from './utils/helpers';
 import { isMainAgent } from './utils/contentFilter';
 import { apiUrl } from './utils/apiUrl';
@@ -211,6 +212,10 @@ class AppBase extends React.Component {
     this._prefsReady = fetch(apiUrl('/api/preferences'))
       .then(res => res.json())
       .then(data => {
+        // Claude 配置目录注入 i18n 占位符缓存；必须在这里（无条件 fetch），
+        // 不能放在 ChatView._loadPresets 里——那个路径被 agentTeamEnabled 守卫挡住，
+        // 对没开 Agent Team 的用户永远不会 hydrate。
+        if (typeof data.claudeConfigDir === 'string') setClaudeConfigDir(data.claudeConfigDir);
         if (data.lang) {
           setLang(data.lang);
           this.setState({ lang: data.lang });

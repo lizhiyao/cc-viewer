@@ -187,10 +187,15 @@ export function resolveNativePath() {
   }
 
   // 3. 检查常见 native 安装路径
+  //    注意：~/.claude/ 前缀走 getClaudeConfigDir()，尊重 CLAUDE_CONFIG_DIR 重定向；
+  //    其他 ~/ 前缀（如 ~/.local）只走普通 homedir 展开。
   const home = homedir();
-  const candidates = NATIVE_CANDIDATES.map(p =>
-    p.startsWith('~') ? join(home, p.slice(2)) : p
-  );
+  const claudeDir = getClaudeConfigDir();
+  const candidates = NATIVE_CANDIDATES.map(p => {
+    if (p.startsWith('~/.claude/')) return join(claudeDir, p.slice('~/.claude/'.length));
+    if (p.startsWith('~')) return join(home, p.slice(2));
+    return p;
+  });
   for (const p of candidates) {
     if (existsSync(p)) {
       return p;

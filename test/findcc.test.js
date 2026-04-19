@@ -282,6 +282,72 @@ describe('findcc: findPlatformBinary', () => {
   });
 });
 
+// Subprocess helper: runs resolveNativePath with CLAUDE_CONFIG_DIR pointing at
+// a fake dir; the test verifies `~/.claude/local/claude` in NATIVE_CANDIDATES is
+// rewritten through getClaudeConfigDir() while `~/.local/` stays on homedir().
+function runResolveNativePathWithConfigDir({ claudeConfigDir, fakeHome, shimDir }) {
+  return execFileSync(process.execPath, [
+    '--input-type=module',
+    '-e',
+    `import { resolveNativePath } from './findcc.js'; process.stdout.write(String(resolveNativePath()));`,
+  ], {
+    cwd: join(import.meta.dirname, '..'),
+    encoding: 'utf-8',
+    env: {
+      PATH: `${shimDir || '/nonexistent'}:/usr/bin:/bin`,
+      HOME: fakeHome,
+      CLAUDE_CONFIG_DIR: claudeConfigDir,
+      // 让 step 1 和 step 4 的 getGlobalNodeModulesDir() 指向空目录
+      NPM_CONFIG_PREFIX: '/tmp/findcc-test-fake-prefix-' + Date.now(),
+    },
+    timeout: 5000,
+  });
+}
+
+describe('findcc: resolveNativePath ~/.claude/ CLAUDE_CONFIG_DIR rewrite', () => {
+  it('expands ~/.claude/local/claude through CLAUDE_CONFIG_DIR when set', () => {
+    const base = mkdtempSync(join(tmpdir(), 'findcc-ccdir-'));
+    const fakeHome = join(base, 'home');
+    const customDir = join(base, 'custom-claude');
+    const localDir = join(customDir, 'local');
+    mkdirSync(fakeHome, { recursive: true });
+    mkdirSync(localDir, { recursive: true });
+    const binPath = join(localDir, 'claude');
+    writeFileSync(binPath, '#!/bin/sh\nexit 0\n');
+    chmodSync(binPath, 0o755);
+    try {
+      const out = runResolveNativePathWithConfigDir({
+        claudeConfigDir: customDir,
+        fakeHome,
+      });
+      assert.equal(out, binPath,
+        `expected ${binPath} under CLAUDE_CONFIG_DIR, got ${out}`);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
+  it('returns null when CLAUDE_CONFIG_DIR is set but no claude under it', () => {
+    const base = mkdtempSync(join(tmpdir(), 'findcc-ccdir-empty-'));
+    const fakeHome = join(base, 'home');
+    const customDir = join(base, 'custom-claude');  // empty dir, no local/claude
+    mkdirSync(fakeHome, { recursive: true });
+    mkdirSync(customDir, { recursive: true });
+    try {
+      const out = runResolveNativePathWithConfigDir({
+        claudeConfigDir: customDir,
+        fakeHome,
+      });
+      // May be null, or may pick up a real-host /usr/local/bin/claude etc.
+      // The invariant this test guards: NOT the fake customDir path.
+      assert.ok(!out.startsWith(customDir),
+        `should not have found claude under empty ${customDir}, got ${out}`);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('findcc: resolveNativePath rejection rules (the actual bug fix)', () => {
   it('ACCEPTS a non-.js binary whose realpath is under node_modules (Claude Code 2.x layout)', () => {
     const base = mkdtempSync(join(tmpdir(), 'findcc-native-ok-'));

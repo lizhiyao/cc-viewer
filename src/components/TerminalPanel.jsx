@@ -7,6 +7,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import '@xterm/xterm/css/xterm.css';
 import { t } from '../i18n';
+import { tc, getClaudeConfigDir } from '../utils/tClaude';
 import { apiUrl } from '../utils/apiUrl';
 import { isMobile, isIOS, isPad } from '../env';
 import styles from './TerminalPanel.module.css';
@@ -1027,7 +1028,9 @@ class TerminalPanel extends React.Component {
     if (this.state.agentTeamEnabling) return;
     this.setState({ agentTeamEnabling: true });
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const prompt = 'Add "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" to the env object in ~/.claude/settings.json. If the env key does not exist, create it. Preserve all existing content. Only modify this one field. If ~/.claude/settings.json does not exist, instead add the line: export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 to the user\'s shell profile (~/.zshrc or ~/.bashrc).';
+      // 用当前真实的配置目录拼 prompt，避免 CLAUDE_CONFIG_DIR 用户让 Claude 去改错文件
+      const settingsPath = `${getClaudeConfigDir()}/settings.json`;
+      const prompt = `Add "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" to the env object in ${settingsPath}. If the env key does not exist, create it. Preserve all existing content. Only modify this one field. If ${settingsPath} does not exist, instead add the line: export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 to the user's shell profile (~/.zshrc or ~/.bashrc).`;
       this.ws.send(JSON.stringify({ type: 'input', data: prompt + '\r' }));
       message.success('需要重启 Claude Code 才能生效');
     }
@@ -1110,7 +1113,7 @@ class TerminalPanel extends React.Component {
                 overlayInnerStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-hover)', borderRadius: 8, padding: '12px 16px', maxWidth: 360 }}
                 content={
                   <div>
-                    <div className={styles.agentTeamDisabledTip}>{t('ui.terminal.agentTeamDisabledTip')}</div>
+                    <div className={styles.agentTeamDisabledTip}>{tc('ui.terminal.agentTeamDisabledTip')}</div>
                     <Button type="primary" size="small" loading={this.state.agentTeamEnabling} disabled={this.state.agentTeamEnabling} onClick={this.handleEnableAgentTeam}>{this.state.agentTeamEnabling ? t('ui.terminal.agentTeamEnabling') : t('ui.terminal.agentTeamEnable')}</Button>
                   </div>
                 }

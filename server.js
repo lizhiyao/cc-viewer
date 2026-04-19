@@ -453,6 +453,10 @@ async function handleRequest(req, res) {
     let prefs = {};
     try { if (existsSync(getPrefsFile())) prefs = JSON.parse(readFileSync(getPrefsFile(), 'utf-8')); } catch { }
     prefs.logDir = LOG_DIR; // 始终返回当前运行时的日志目录
+    // home-friendly 展示形态：设了 CLAUDE_CONFIG_DIR 的用户看到真实路径，默认用户看到 "~/.claude"
+    // join() 而非字符串拼接，避免 Windows 分隔符不匹配导致比较失败
+    const _cDir = getClaudeConfigDir();
+    prefs.claudeConfigDir = _cDir === join(homedir(), '.claude') ? '~/.claude' : _cDir;
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(prefs));
     return;

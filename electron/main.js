@@ -18,6 +18,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const rootDir = join(__dirname, '..');
 const { t } = await import(join(rootDir, 'i18n.js'));
+const { getClaudeConfigDir } = await import(join(rootDir, 'findcc.js'));
 
 // --- Resolve shell environment (Finder-launched Electron has minimal env) ---
 // When launched from Finder/dock, process.env lacks shell profile vars (HTTP_PROXY, PATH, LANG, etc.)
@@ -502,8 +503,8 @@ function cycleTab(direction) {
 // --- Theme watching ---
 function watchTheme() {
   try {
-    const home = app.getPath('home');
-    const prefsPath = join(home, '.claude', 'cc-viewer', 'preferences.json');
+    // 通过 getClaudeConfigDir() 读取配置目录，尊重 CLAUDE_CONFIG_DIR 重定向
+    const prefsPath = join(getClaudeConfigDir(), 'cc-viewer', 'preferences.json');
     if (!existsSync(prefsPath)) return;
     const readTheme = () => {
       try {

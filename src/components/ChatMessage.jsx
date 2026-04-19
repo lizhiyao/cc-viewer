@@ -8,6 +8,7 @@ import { apiUrl } from '../utils/apiUrl';
 import { isMobile, isIOS, isPad } from '../env';
 import AskQuestionForm from './AskQuestionForm';
 import { t } from '../i18n';
+import { tc } from '../utils/tClaude';
 import { isPlanApprovalPrompt } from '../utils/promptClassifier';
 import DiffView from './DiffView';
 import ToolResultView from './ToolResultView';
@@ -842,7 +843,7 @@ class ChatMessage extends React.Component {
               <div className={styles.thinkingEmptyHint}>
                 <Text type="secondary" className={styles.thinkingEmptyText}>{t('ui.thinkingEmpty')}</Text>
                 {!this.props.showThinkingSummaries && (
-                  <Tooltip title={t('ui.enableThinkingSummariesTip')}>
+                  <Tooltip title={tc('ui.enableThinkingSummariesTip')}>
                     <Button
                       size="small"
                       type="primary"
@@ -857,7 +858,7 @@ class ChatMessage extends React.Component {
                             body: JSON.stringify({ showThinkingSummaries: true }),
                           });
                           if (res.ok) {
-                            message.success(t('ui.enableThinkingSummariesTip'));
+                            message.success(tc('ui.enableThinkingSummariesTip'));
                           }
                         } catch { message.error('Failed to save setting'); }
                       }}

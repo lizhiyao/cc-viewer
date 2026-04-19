@@ -96,6 +96,29 @@ describe('server API endpoints', { concurrency: false }, () => {
     assert.equal(typeof data, 'object');
   });
 
+  it('GET /api/preferences exposes claudeConfigDir as "~/.claude" by default', async () => {
+    const res = await httpRequest(port, '/api/preferences');
+    const data = res.json();
+    // 服务器启动时未设 CLAUDE_CONFIG_DIR → 默认 ~/.claude
+    // （路径比较用 path.join 以防 Windows 分隔符不匹配）
+    assert.equal(data.claudeConfigDir, '~/.claude',
+      `expected "~/.claude" for default config dir, got ${JSON.stringify(data.claudeConfigDir)}`);
+  });
+
+  it('GET /api/preferences exposes claudeConfigDir as absolute path when CLAUDE_CONFIG_DIR is set', async () => {
+    const prev = process.env.CLAUDE_CONFIG_DIR;
+    process.env.CLAUDE_CONFIG_DIR = '/tmp/my-custom-claude-dir';
+    try {
+      const res = await httpRequest(port, '/api/preferences');
+      const data = res.json();
+      assert.equal(data.claudeConfigDir, '/tmp/my-custom-claude-dir',
+        `expected absolute path when CLAUDE_CONFIG_DIR is set, got ${JSON.stringify(data.claudeConfigDir)}`);
+    } finally {
+      if (prev === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+      else process.env.CLAUDE_CONFIG_DIR = prev;
+    }
+  });
+
   // --- POST /api/preferences ---
   it('POST /api/preferences with invalid JSON returns 400', async () => {
     const res = await httpRequest(port, '/api/preferences', {
