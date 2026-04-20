@@ -95,12 +95,73 @@ function fixSpawnHelperPermissions() {
 }
 
 // Opus 4.7 默认不再返回 thinking；为所有非显式覆写的调用加上 summarized。
+// 纯函数：仅根据 args 决定是否注入；是否「应该」注入由 caller 先用 probeClaudeSupportsThinkingDisplay 判断。
 export function withDefaultThinkingDisplay(args) {
   if (!Array.isArray(args)) return args;
   const hasFlag = args.some(a =>
     a === '--thinking-display' || (typeof a === 'string' && a.startsWith('--thinking-display='))
   );
   return hasFlag ? args : [...args, '--thinking-display', 'summarized'];
+}
+
+// `--thinking-display` 自 Claude Code 2.1.112 起支持（更早版本会报 unknown option 崩溃）。
+// 运行时跑 `claude --version` 解析 semver，按 claudePath 缓存避免每次 spawn 都跑一次子进程。
+export const MIN_THINKING_DISPLAY_VERSION = [2, 1, 112];
+const _thinkingDisplaySupportCache = new Map();
+
+// 比较两个 [major, minor, patch] tuple：a ≥ b 返回 true
+export function gte(a, b) {
+  for (let i = 0; i < 3; i++) {
+    if (a[i] > b[i]) return true;
+    if (a[i] < b[i]) return false;
+  }
+  return true;
+}
+
+// 从 `claude --version` 输出抽 semver，例如 "2.1.114 (Claude Code)" → [2,1,114]
+// 备注：prerelease 后缀（如 "2.1.112-beta.1"）会被视同对应 release 版本——正则只抓头三段数字，
+// 忽略 `-beta`、`rc1`、`v` 前缀、第四段等变体。Anthropic 不发 prerelease，现实中无问题。
+export function parseClaudeVersion(output) {
+  if (typeof output !== 'string') return null;
+  const m = output.match(/(\d+)\.(\d+)\.(\d+)/);
+  if (!m) return null;
+  return [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10)];
+}
+
+export async function probeClaudeSupportsThinkingDisplay(claudePath, nodePath, isNpmVersion) {
+  if (!claudePath) return false;
+  if (_thinkingDisplaySupportCache.has(claudePath)) return _thinkingDisplaySupportCache.get(claudePath);
+  try {
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const run = promisify(execFile);
+    const useNode = isNpmVersion && typeof claudePath === 'string' && claudePath.endsWith('.js');
+    const cmd = useNode ? (nodePath || process.execPath) : claudePath;
+    const cmdArgs = useNode ? [claudePath, '--version'] : ['--version'];
+    const { stdout } = await run(cmd, cmdArgs, { timeout: 4000 });
+    const ver = parseClaudeVersion(stdout);
+    const supported = !!ver && gte(ver, MIN_THINKING_DISPLAY_VERSION);
+    _thinkingDisplaySupportCache.set(claudePath, supported);
+    return supported;
+  } catch {
+    // 探测失败（超时/错误）保守认为不支持——避免 spawn 时 claude 用 unknown option 崩溃。
+    _thinkingDisplaySupportCache.set(claudePath, false);
+    return false;
+  }
+}
+
+export function _clearThinkingDisplaySupportCache() {
+  _thinkingDisplaySupportCache.clear();
+}
+
+// 仅用于测试：查询指定路径是否在 cache 中
+export function _hasThinkingDisplaySupportCached(claudePath) {
+  return _thinkingDisplaySupportCache.has(claudePath);
+}
+
+// 仅用于测试：获取 cache 大小
+export function _thinkingDisplaySupportCacheSize() {
+  return _thinkingDisplaySupportCache.size;
 }
 
 export async function spawnClaude(proxyPort, cwd, extraArgs = [], claudePath = null, isNpmVersion = false, serverPort = null) {
@@ -153,7 +214,8 @@ export async function spawnClaude(proxyPort, cwd, extraArgs = [], claudePath = n
     }
   });
 
-  const finalExtraArgs = withDefaultThinkingDisplay(extraArgs);
+  const supportsThinkingDisplay = await probeClaudeSupportsThinkingDisplay(claudePath, nodePath, isNpmVersion);
+  const finalExtraArgs = supportsThinkingDisplay ? withDefaultThinkingDisplay(extraArgs) : extraArgs;
 
   let command = claudePath;
   let args = ['--settings', settingsJson, ...finalExtraArgs];

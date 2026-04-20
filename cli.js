@@ -274,9 +274,16 @@ async function runProxyCommand(args) {
       }
     });
 
-    // 注入默认 --thinking-display summarized（用户已显式传入则不覆盖）
-    const { withDefaultThinkingDisplay } = await import('./pty-manager.js');
-    cmdArgs = withDefaultThinkingDisplay(cmdArgs);
+    // 注入默认 --thinking-display summarized（Claude Code ≥2.1.112 支持）。
+    // 仅对 claude 二进制探测；其他用户命令（`ccv run -- sometool`）跳过，避免无意义子进程 + cache 污染。
+    // 探测 `claude --version` 解析 semver；不支持/探测失败时跳过注入，避免 unknown option 崩溃。
+    const isClaudeCmd = cmd === 'claude' || /[\\/]claude(\.exe)?$/.test(cmd);
+    if (isClaudeCmd) {
+      const { withDefaultThinkingDisplay, probeClaudeSupportsThinkingDisplay } = await import('./pty-manager.js');
+      if (await probeClaudeSupportsThinkingDisplay(cmd, process.execPath, false)) {
+        cmdArgs = withDefaultThinkingDisplay(cmdArgs);
+      }
+    }
 
     cmdArgs.unshift(settingsJson);
     cmdArgs.unshift('--settings');

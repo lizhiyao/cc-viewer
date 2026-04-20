@@ -13,6 +13,13 @@ import {
   getCurrentWorkspace,
   getOutputBuffer,
   withDefaultThinkingDisplay,
+  parseClaudeVersion,
+  probeClaudeSupportsThinkingDisplay,
+  _clearThinkingDisplaySupportCache,
+  _hasThinkingDisplaySupportCached,
+  _thinkingDisplaySupportCacheSize,
+  gte,
+  MIN_THINKING_DISPLAY_VERSION,
 } from '../pty-manager.js';
 
 // ─── getPtyPid / getPtyState / getCurrentWorkspace (no PTY running) ───
@@ -252,5 +259,125 @@ describe('pty-manager: withDefaultThinkingDisplay', () => {
     // And no duplicate flag appended
     const count = out.filter(a => a === '--thinking-display').length;
     assert.equal(count, 1);
+  });
+});
+
+// ─── parseClaudeVersion ───
+
+describe('pty-manager: parseClaudeVersion', () => {
+  it('parses standard `X.Y.Z (Claude Code)` output', () => {
+    assert.deepEqual(parseClaudeVersion('2.1.114 (Claude Code)'), [2, 1, 114]);
+  });
+
+  it('parses just a version string', () => {
+    assert.deepEqual(parseClaudeVersion('1.0.0'), [1, 0, 0]);
+  });
+
+  it('parses version with leading text', () => {
+    assert.deepEqual(parseClaudeVersion('claude version 2.1.112\n'), [2, 1, 112]);
+  });
+
+  it('returns null on non-string input', () => {
+    assert.equal(parseClaudeVersion(null), null);
+    assert.equal(parseClaudeVersion(undefined), null);
+    assert.equal(parseClaudeVersion(123), null);
+  });
+
+  it('returns null when no semver found', () => {
+    assert.equal(parseClaudeVersion('no version here'), null);
+    assert.equal(parseClaudeVersion(''), null);
+  });
+
+  it('picks the first semver when multiple appear', () => {
+    assert.deepEqual(parseClaudeVersion('claude 2.1.114 node 20.11.1'), [2, 1, 114]);
+  });
+});
+
+// ─── probeClaudeSupportsThinkingDisplay ───
+// 通过替换全局模块 loader 来 mock execFile 成本较高，这里用真实 execFile 调 `node --version`
+// 验证 semver 解析 + 缓存机制（node 版本肯定高于 2.1.112，判断为支持）。
+describe('pty-manager: probeClaudeSupportsThinkingDisplay', () => {
+  beforeEach(() => { _clearThinkingDisplaySupportCache(); });
+
+  it('returns false when claudePath is null/empty', async () => {
+    assert.equal(await probeClaudeSupportsThinkingDisplay(null, null, false), false);
+    assert.equal(await probeClaudeSupportsThinkingDisplay('', null, false), false);
+  });
+
+  it('returns false when probe fails (non-existent binary)', async () => {
+    const r = await probeClaudeSupportsThinkingDisplay('/no/such/claude-binary-does-not-exist', null, false);
+    assert.equal(r, false);
+  });
+
+  it('returns false idempotently for non-existent path (not a positive cache-effectiveness test)', async () => {
+    const path = '/no/such/claude-binary-for-cache-test';
+    const r1 = await probeClaudeSupportsThinkingDisplay(path, null, false);
+    const r2 = await probeClaudeSupportsThinkingDisplay(path, null, false);
+    assert.equal(r1, r2);
+    // 注：两次都走 spawn 失败路径，即使不缓存也返回一致。此 test 只保证幂等语义。
+    // 真正证明缓存生效的 test 见下方 "caches positive result and avoids re-probing"。
+  });
+
+  it('caches positive result and avoids re-probing', async () => {
+    assert.equal(_thinkingDisplaySupportCacheSize(), 0, 'cache empty at start');
+    const first = await probeClaudeSupportsThinkingDisplay(process.execPath, null, false);
+    assert.equal(first, true);
+    assert.equal(_thinkingDisplaySupportCacheSize(), 1, 'one entry after first probe');
+    assert.equal(_hasThinkingDisplaySupportCached(process.execPath), true, 'path is cached');
+    const second = await probeClaudeSupportsThinkingDisplay(process.execPath, null, false);
+    assert.equal(second, true);
+    assert.equal(_thinkingDisplaySupportCacheSize(), 1, 'cache size unchanged after second probe — hit, no new entry');
+  });
+
+  it('returns true when probed binary reports ≥ 2.1.112 (simulated via node which returns Node semver)', async () => {
+    // `node --version` 输出 "v<semver>" —— parseClaudeVersion 提取 semver；Node 20+ 远高于 2.1.112
+    const r = await probeClaudeSupportsThinkingDisplay(process.execPath, null, false);
+    assert.equal(r, true);
+  });
+});
+
+// ─── gte (semver tuple comparison) ───
+
+describe('pty-manager: gte', () => {
+  it('returns true for equal versions', () => {
+    assert.equal(gte([2, 1, 112], [2, 1, 112]), true);
+    assert.equal(gte([0, 0, 0], [0, 0, 0]), true);
+  });
+
+  it('returns false when patch is lower', () => {
+    assert.equal(gte([2, 1, 111], [2, 1, 112]), false);
+    assert.equal(gte([2, 1, 0], [2, 1, 112]), false);
+  });
+
+  it('returns true when patch is higher', () => {
+    assert.equal(gte([2, 1, 113], [2, 1, 112]), true);
+    assert.equal(gte([2, 1, 114], [2, 1, 112]), true);
+  });
+
+  it('returns true when minor is higher (patch lower)', () => {
+    assert.equal(gte([2, 2, 0], [2, 1, 112]), true);
+  });
+
+  it('returns false when minor is lower (patch higher)', () => {
+    assert.equal(gte([2, 0, 999], [2, 1, 112]), false);
+    assert.equal(gte([1, 9, 9], [2, 1, 112]), false);
+  });
+
+  it('returns true when major is higher', () => {
+    assert.equal(gte([3, 0, 0], [2, 1, 112]), true);
+    assert.equal(gte([3, 0, 0], [2, 99, 999]), true);
+  });
+
+  it('returns false when major is lower', () => {
+    assert.equal(gte([1, 99, 999], [2, 1, 112]), false);
+    assert.equal(gte([0, 999, 999], [2, 0, 0]), false);
+  });
+});
+
+// ─── MIN_THINKING_DISPLAY_VERSION constant ───
+
+describe('pty-manager: MIN_THINKING_DISPLAY_VERSION', () => {
+  it('matches the known introduction version 2.1.112', () => {
+    assert.deepEqual(MIN_THINKING_DISPLAY_VERSION, [2, 1, 112]);
   });
 });
