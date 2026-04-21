@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { DownloadOutlined, CopyOutlined, CameraOutlined } from '@ant-design/icons';
 import { apiUrl } from '../utils/apiUrl';
+import { useMarkdownExport } from '../hooks/useMarkdownExport';
 import CodeMirror from '@uiw/react-codemirror';
 import { EditorView } from '@codemirror/view';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
@@ -281,15 +283,40 @@ export default function FileContentView({ filePath, onClose, editorSession, scro
   const [closing, setClosing] = useState(false);
   const isMdFile = /\.md$/i.test(filePath);
   const [viewMode, setViewMode] = useState(isMdFile ? 'markdown' : 'text');
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const containerRef = useRef(null);
   const mounted = useRef(true);
   const saveTimeoutRef = useRef(null);
   const saveRef = useRef(null);
   const lineNumRef = useRef(null);
   const editorViewRef = useRef(null);
+  const markdownPreviewRef = useRef(null);
+  const downloadWrapRef = useRef(null);
   const editorWrapperRef = useRef(null);
 
   const isDirty = content !== null && currentContent !== null && content !== currentContent;
+
+  const { handleCopy, handleSaveAs, handleSaveAsImage } = useMarkdownExport({
+    getText: useCallback(() => (isDirty ? currentContent : content) ?? '', [isDirty, currentContent, content]),
+    getSnapshotTarget: useCallback(() => markdownPreviewRef.current, []),
+    onDone: useCallback(() => setDownloadMenuOpen(false), []),
+  });
+
+  useEffect(() => {
+    if (!downloadMenuOpen) return;
+    const onDocClick = (e) => {
+      if (downloadWrapRef.current && !downloadWrapRef.current.contains(e.target)) {
+        setDownloadMenuOpen(false);
+      }
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setDownloadMenuOpen(false); };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [downloadMenuOpen]);
 
   const handleClose = useCallback(() => {
     if (closing) return;
@@ -501,6 +528,40 @@ export default function FileContentView({ filePath, onClose, editorSession, scro
             </span>
           )}
           {isMdFile && (
+            <div className={styles.downloadWrap} ref={downloadWrapRef}>
+              <button
+                className={styles.viewToggleBtn}
+                onClick={() => setDownloadMenuOpen(v => !v)}
+                title={i18n('ui.saveAs')}
+                aria-label={i18n('ui.saveAs')}
+                aria-expanded={downloadMenuOpen}
+              >
+                <DownloadOutlined />
+              </button>
+              {downloadMenuOpen && (
+                <div className={styles.downloadMenu}>
+                  <button className={styles.downloadMenuItem} onClick={handleSaveAs}>
+                    <DownloadOutlined />
+                    <span>{i18n('ui.saveAsMd')}</span>
+                  </button>
+                  <button className={styles.downloadMenuItem} onClick={handleCopy}>
+                    <CopyOutlined />
+                    <span>{i18n('ui.copyTextContent')}</span>
+                  </button>
+                  <button
+                    className={styles.downloadMenuItem}
+                    onClick={handleSaveAsImage}
+                    disabled={viewMode !== 'markdown'}
+                    title={viewMode !== 'markdown' ? i18n('ui.saveAsImageHintMd') : undefined}
+                  >
+                    <CameraOutlined />
+                    <span>{i18n('ui.saveAsImage')}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          {isMdFile && (
             <button
               className={`${styles.viewToggleBtn}${viewMode === 'markdown' ? ` ${styles.viewToggleActive}` : ''}`}
               onClick={() => setViewMode(v => v === 'markdown' ? 'text' : 'markdown')}
@@ -542,7 +603,7 @@ export default function FileContentView({ filePath, onClose, editorSession, scro
         {error && <div className={styles.error}>{error}</div>}
         {loading && !error && <div className={styles.loading}>{i18n('ui.loading')}</div>}
         {!loading && content !== null && viewMode === 'markdown' && isMdFile && (
-          <div className={styles.markdownPreview} dangerouslySetInnerHTML={{ __html: renderMarkdown(isDirty ? currentContent : content) }} />
+          <div ref={markdownPreviewRef} className={styles.markdownPreview} dangerouslySetInnerHTML={{ __html: renderMarkdown(isDirty ? currentContent : content) }} />
         )}
         {!loading && content !== null && !(viewMode === 'markdown' && isMdFile) && (
           <div className={styles.editorWrapper} ref={editorWrapperRef}>

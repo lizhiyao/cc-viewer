@@ -605,10 +605,12 @@ class AppHeader extends React.Component {
       </div>
     );
 
+    const ctxColor = contextPercent >= 80 ? 'var(--color-error-light)' : contextPercent >= 60 ? 'var(--color-warning-light)' : 'var(--color-success)';
     return (
       <div className={styles.cachePopover}>
         <div className={styles.cachePopoverHeader}>
           <div className={styles.cachePopoverTitle}>
+            <span className={styles.cachePercent} style={{ color: ctxColor }}>{contextPercent}%</span>
             <span className={styles.cacheCalibrationLabel}>{t('ui.calibrationModelLabel')}</span>
             <Select
               size="small"
@@ -622,8 +624,8 @@ class AppHeader extends React.Component {
         </div>
         {(hasBuiltin || hasMcp) && (
           <div className={styles.cacheScrollArea}>
-            {hasBuiltin && renderGroup('tools_builtin', 'ui.builtinTools', builtin.length, false, builtinBody)}
-            {hasMcp && renderGroup('tools_mcp', 'ui.mcpTools', Array.from(mcpByServer.values()).reduce((n, arr) => n + arr.length, 0), true, mcpBody)}
+            {hasBuiltin && renderGroup('tools_builtin', 'ui.builtinTools', builtin.length, true, builtinBody)}
+            {hasMcp && renderGroup('tools_mcp', 'ui.mcpTools', Array.from(mcpByServer.values()).reduce((n, arr) => n + arr.length, 0), false, mcpBody)}
           </div>
         )}
       </div>

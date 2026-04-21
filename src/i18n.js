@@ -1648,6 +1648,22 @@ const i18nData = {
     "ar": "حفظ كصورة", "no": "Lagre som bilde", "pt-BR": "Salvar como imagem",
     "th": "บันทึกเป็นรูปภาพ", "tr": "Resim olarak kaydet", "uk": "Зберегти як зображення"
   },
+  "ui.saveAsImageHintMd": {
+    "zh": "请先切换到 Markdown 预览模式", "en": "Switch to Markdown preview first", "zh-TW": "請先切換至 Markdown 預覽模式",
+    "ko": "먼저 Markdown 미리보기로 전환하세요", "ja": "先に Markdown プレビューに切り替えてください", "de": "Zuerst zur Markdown-Vorschau wechseln",
+    "es": "Primero cambia a la vista previa de Markdown", "fr": "Passez d'abord à l'aperçu Markdown", "it": "Passa prima all'anteprima Markdown",
+    "da": "Skift først til Markdown-forhåndsvisning", "pl": "Najpierw przełącz na podgląd Markdown", "ru": "Сначала переключитесь на предпросмотр Markdown",
+    "ar": "قم بالتبديل إلى معاينة Markdown أولاً", "no": "Bytt til Markdown-forhåndsvisning først", "pt-BR": "Mude para a prévia Markdown primeiro",
+    "th": "สลับไปที่ตัวอย่าง Markdown ก่อน", "tr": "Önce Markdown önizlemesine geçin", "uk": "Спершу перейдіть у попередній перегляд Markdown"
+  },
+  "ui.saveFailed": {
+    "zh": "保存失败", "en": "Save failed", "zh-TW": "儲存失敗",
+    "ko": "저장 실패", "ja": "保存に失敗しました", "de": "Speichern fehlgeschlagen",
+    "es": "Error al guardar", "fr": "Échec de l'enregistrement", "it": "Salvataggio non riuscito",
+    "da": "Gem mislykket", "pl": "Zapisywanie nie powiodło się", "ru": "Ошибка сохранения",
+    "ar": "فشل الحفظ", "no": "Lagring mislyktes", "pt-BR": "Falha ao salvar",
+    "th": "บันทึกไม่สำเร็จ", "tr": "Kaydedilemedi", "uk": "Помилка збереження"
+  },
   "ui.contextMenu.revealInExplorer": {
     "zh": "在系统中展示",
     "en": "Reveal in Explorer",
@@ -4323,6 +4339,38 @@ const i18nData = {
     "da": "Fjern billede", "pl": "Usuń obraz", "ru": "Удалить изображение",
     "ar": "إزالة الصورة", "no": "Fjern bilde", "pt-BR": "Remover imagem",
     "th": "ลบรูปภาพ", "tr": "Resmi kaldır", "uk": "Видалити зображення"
+  },
+  "ui.chatInput.confirmRemoveImage": {
+    "zh": "确定移除此图片？", "en": "Remove this image?", "zh-TW": "確定移除此圖片？",
+    "ko": "이 이미지를 제거하시겠습니까?", "ja": "この画像を削除しますか？", "de": "Dieses Bild entfernen?",
+    "es": "¿Eliminar esta imagen?", "fr": "Supprimer cette image ?", "it": "Rimuovere questa immagine?",
+    "da": "Fjern dette billede?", "pl": "Usunąć ten obraz?", "ru": "Удалить это изображение?",
+    "ar": "إزالة هذه الصورة؟", "no": "Fjerne dette bildet?", "pt-BR": "Remover esta imagem?",
+    "th": "ลบรูปภาพนี้?", "tr": "Bu resim kaldırılsın mı?", "uk": "Видалити це зображення?"
+  },
+  "ui.chatInput.confirmRemoveFile": {
+    "zh": "确定移除此文件？", "en": "Remove this file?", "zh-TW": "確定移除此檔案？",
+    "ko": "이 파일을 제거하시겠습니까?", "ja": "このファイルを削除しますか？", "de": "Diese Datei entfernen?",
+    "es": "¿Eliminar este archivo?", "fr": "Supprimer ce fichier ?", "it": "Rimuovere questo file?",
+    "da": "Fjern denne fil?", "pl": "Usunąć ten plik?", "ru": "Удалить этот файл?",
+    "ar": "إزالة هذا الملف؟", "no": "Fjerne denne filen?", "pt-BR": "Remover este arquivo?",
+    "th": "ลบไฟล์นี้?", "tr": "Bu dosya kaldırılsın mı?", "uk": "Видалити цей файл?"
+  },
+  "ui.common.confirmYes": {
+    "zh": "确定", "en": "Yes", "zh-TW": "確定",
+    "ko": "예", "ja": "はい", "de": "Ja",
+    "es": "Sí", "fr": "Oui", "it": "Sì",
+    "da": "Ja", "pl": "Tak", "ru": "Да",
+    "ar": "نعم", "no": "Ja", "pt-BR": "Sim",
+    "th": "ใช่", "tr": "Evet", "uk": "Так"
+  },
+  "ui.common.confirmCancel": {
+    "zh": "取消", "en": "Cancel", "zh-TW": "取消",
+    "ko": "취소", "ja": "キャンセル", "de": "Abbrechen",
+    "es": "Cancelar", "fr": "Annuler", "it": "Annulla",
+    "da": "Annuller", "pl": "Anuluj", "ru": "Отмена",
+    "ar": "إلغاء", "no": "Avbryt", "pt-BR": "Cancelar",
+    "th": "ยกเลิก", "tr": "İptal", "uk": "Скасувати"
   },
   "ui.chatInput.more": {
     "zh": "更多",

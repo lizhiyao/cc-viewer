@@ -3,6 +3,8 @@ import { uploadFileAndGetPath } from './TerminalPanel';
 import { apiUrl } from '../utils/apiUrl';
 import { isMobile, isPad } from '../env';
 import { t, getLang } from '../i18n';
+import ImageLightbox from './ImageLightbox';
+import ConfirmRemoveButton from './ConfirmRemoveButton';
 import styles from './ChatInputBar.module.css';
 
 const SpeechRec = typeof window !== 'undefined' && window.isSecureContext
@@ -21,6 +23,7 @@ function ChatInputBar({ inputRef, inputEmpty, inputSuggestion, terminalVisible, 
   const [plusOpen, setPlusOpen] = useState(false);
   const [recording, setRecording] = useState(false);
   const [interimText, setInterimText] = useState('');
+  const [lightbox, setLightbox] = useState(null);
   const recRef = useRef(null);
   const anchorRef = useRef({ prefix: '', suffix: '' });
   const rootRef = useRef(null);
@@ -199,18 +202,24 @@ function ChatInputBar({ inputRef, inputEmpty, inputSuggestion, terminalVisible, 
               {pendingImages.map((img, i) => {
                 const fileName = img.path.split('/').pop() || img.path;
                 const isImage = /\.(png|jpe?g|gif|svg|bmp|webp|avif|ico|icns)$/i.test(fileName);
+                const src = apiUrl(`/api/file-raw?path=${encodeURIComponent(img.path)}`);
                 return isImage ? (
                   <div key={img.path} className={styles.imagePreviewItem}>
                     <img
-                      src={apiUrl(`/api/file-raw?path=${encodeURIComponent(img.path)}`)}
+                      src={src}
                       className={styles.imagePreviewThumb}
                       alt={fileName}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setLightbox({ src, alt: fileName })}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLightbox({ src, alt: fileName }); } }}
                     />
-                    <button
+                    <ConfirmRemoveButton
+                      title={t('ui.chatInput.confirmRemoveImage')}
+                      onConfirm={() => onRemovePendingImage?.(i)}
                       className={styles.imagePreviewRemove}
-                      onClick={() => onRemovePendingImage?.(i)}
-                      title={t('ui.chatInput.removeImage')}
-                    >&times;</button>
+                      ariaLabel={t('ui.chatInput.removeImage')}
+                    >&times;</ConfirmRemoveButton>
                   </div>
                 ) : (
                   <div key={img.path} className={styles.filePreviewChip}>
@@ -219,11 +228,12 @@ function ChatInputBar({ inputRef, inputEmpty, inputSuggestion, terminalVisible, 
                       <polyline points="14 2 14 8 20 8" />
                     </svg>
                     <span className={styles.filePreviewName}>{fileName}</span>
-                    <button
+                    <ConfirmRemoveButton
+                      title={t('ui.chatInput.confirmRemoveFile')}
+                      onConfirm={() => onRemovePendingImage?.(i)}
                       className={styles.filePreviewClose}
-                      onClick={() => onRemovePendingImage?.(i)}
-                      title={t('ui.chatInput.removeImage')}
-                    >&times;</button>
+                      ariaLabel={t('ui.chatInput.removeImage')}
+                    >&times;</ConfirmRemoveButton>
                   </div>
                 );
               })}
@@ -379,6 +389,9 @@ function ChatInputBar({ inputRef, inputEmpty, inputSuggestion, terminalVisible, 
           </div>
         </div>
       </div>
+      {lightbox && (
+        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />
+      )}
     </div>
   );
 }

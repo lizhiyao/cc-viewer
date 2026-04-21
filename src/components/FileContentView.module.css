@@ -133,16 +133,25 @@
 .viewToggleBtn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   padding: 4px 10px;
   border: 1px solid var(--border-hover);
   background: var(--bg-elevated);
   color: var(--text-tertiary);
   font-size: 12px;
+  line-height: 18px;
+  min-height: 28px;
+  box-sizing: border-box;
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   white-space: nowrap;
+}
+
+.viewToggleBtn :global(.anticon) {
+  font-size: 14px;
+  line-height: 1;
 }
 .viewToggleBtn:hover {
   background: var(--bg-surface);
@@ -152,6 +161,51 @@
 .viewToggleActive {
   color: var(--color-primary-pale);
   border-color: var(--color-primary-pale);
+}
+
+/* ─── Markdown 下载下拉按钮 ─── */
+.downloadWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.downloadMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 160px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-hover);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px var(--overlay-dark-light);
+  padding: 4px;
+  z-index: 20;
+}
+
+.downloadMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.downloadMenuItem:hover:not(:disabled) {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.downloadMenuItem:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .markdownPreview {

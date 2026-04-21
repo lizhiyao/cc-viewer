@@ -16,6 +16,8 @@ import { buildLocalUltraplan } from '../utils/ultraplanTemplates';
 import { getModelMaxTokens } from '../utils/helpers';
 import ConceptHelp from './ConceptHelp';
 import CustomUltraplanEditModal from './CustomUltraplanEditModal';
+import ImageLightbox from './ImageLightbox';
+import ConfirmRemoveButton from './ConfirmRemoveButton';
 
 const darkTerminalTheme = {
   background: '#0a0a0a', foreground: '#d4d4d4', cursor: '#0a0a0a',
@@ -116,6 +118,9 @@ class TerminalPanel extends React.Component {
       presetAddText: '',
       presetAddName: '',
       presetEditId: null,
+      lightbox: null,
+      ultraplanLightbox: null,
+      ultraplanConfirming: false,
     };
   }
 
@@ -1059,19 +1064,34 @@ class TerminalPanel extends React.Component {
             {pendingImages.map((img, i) => {
               const fileName = img.path.split('/').pop() || img.path;
               const isImage = /\.(png|jpe?g|gif|svg|bmp|webp|avif|ico|icns)$/i.test(fileName);
+              const src = apiUrl(`/api/file-raw?path=${encodeURIComponent(img.path)}`);
               return isImage ? (
                 <div key={img.path} className={styles.pendingImageItem}>
                   <img
-                    src={apiUrl(`/api/file-raw?path=${encodeURIComponent(img.path)}`)}
+                    src={src}
                     className={styles.pendingImageThumb}
                     alt={fileName}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => this.setState({ lightbox: { src, alt: fileName } })}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.setState({ lightbox: { src, alt: fileName } }); } }}
                   />
-                  <button className={styles.pendingImageRemove} onClick={() => onRemovePendingImage?.(i)}>&times;</button>
+                  <ConfirmRemoveButton
+                    title={t('ui.chatInput.confirmRemoveImage')}
+                    onConfirm={() => onRemovePendingImage?.(i)}
+                    className={styles.pendingImageRemove}
+                    ariaLabel={t('ui.chatInput.removeImage')}
+                  >&times;</ConfirmRemoveButton>
                 </div>
               ) : (
                 <span key={img.path} className={styles.pendingFileTag}>
                   <span className={styles.pendingFileName}>{fileName}</span>
-                  <button className={styles.pendingFileClose} onClick={() => onRemovePendingImage?.(i)}>&times;</button>
+                  <ConfirmRemoveButton
+                    title={t('ui.chatInput.confirmRemoveFile')}
+                    onConfirm={() => onRemovePendingImage?.(i)}
+                    className={styles.pendingFileClose}
+                    ariaLabel={t('ui.chatInput.removeImage')}
+                  >&times;</ConfirmRemoveButton>
                 </span>
               );
             })}
@@ -1141,7 +1161,10 @@ class TerminalPanel extends React.Component {
                 trigger="click"
                 placement="top"
                 open={this.state.ultraplanOpen}
-                onOpenChange={(v) => { if (!v) this.setState({ ultraplanOpen: false }); }}
+                onOpenChange={(v) => {
+                  if (!v && (this.state.lightbox || this.state.ultraplanLightbox || this.state.ultraplanConfirming)) return;
+                  if (!v) this.setState({ ultraplanOpen: false });
+                }}
                 overlayInnerStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-hover)', borderRadius: 8, padding: 0, width: 420 }}
                 content={
                   <div className={styles.ultraplanPanel}>
@@ -1194,16 +1217,38 @@ class TerminalPanel extends React.Component {
                       <div className={styles.ultraplanFileList}>
                         {this.state.ultraplanFiles.map((f, i) => {
                           const isImage = /\.(png|jpe?g|gif|svg|bmp|webp|avif|ico|icns)$/i.test(f.name);
+                          const src = apiUrl(`/api/file-raw?path=${encodeURIComponent(f.path)}`);
                           return isImage ? (
                             <div key={i} className={styles.ultraplanImageItem} title={f.name}>
-                              <img src={apiUrl(`/api/file-raw?path=${encodeURIComponent(f.path)}`)} className={styles.ultraplanImageThumb} alt={f.name} />
-                              <button className={styles.ultraplanImageRemove} onClick={() => this.handleUltraplanRemoveFile(i)}>&times;</button>
+                              <img
+                                src={src}
+                                className={styles.ultraplanImageThumb}
+                                alt={f.name}
+                                role="button"
+                                tabIndex={0}
+                                onClick={(e) => { e.stopPropagation(); this.setState({ ultraplanLightbox: { src, alt: f.name } }); }}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.setState({ ultraplanLightbox: { src, alt: f.name } }); } }}
+                              />
+                              <ConfirmRemoveButton
+                                title={t('ui.chatInput.confirmRemoveImage')}
+                                onConfirm={() => this.handleUltraplanRemoveFile(i)}
+                                onPopupOpenChange={(open) => this.setState({ ultraplanConfirming: open })}
+                                className={styles.ultraplanImageRemove}
+                                ariaLabel={t('ui.chatInput.removeImage')}
+                              >&times;</ConfirmRemoveButton>
                             </div>
                           ) : (
                             <span key={i} className={styles.ultraplanFileChip} title={f.name}>
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                               <span className={styles.ultraplanFileName}>{f.name}</span>
-                              <span className={styles.ultraplanFileRemove} onClick={() => this.handleUltraplanRemoveFile(i)}>×</span>
+                              <ConfirmRemoveButton
+                                tag="span"
+                                title={t('ui.chatInput.confirmRemoveFile')}
+                                onConfirm={() => this.handleUltraplanRemoveFile(i)}
+                                onPopupOpenChange={(open) => this.setState({ ultraplanConfirming: open })}
+                                className={styles.ultraplanFileRemove}
+                                ariaLabel={t('ui.chatInput.removeImage')}
+                              >&times;</ConfirmRemoveButton>
                             </span>
                           );
                         })}
@@ -1417,6 +1462,21 @@ class TerminalPanel extends React.Component {
           onDelete={this.deleteCustomUltraplanExpert}
           onClose={this.closeCustomUltraplanEditor}
         />
+        {this.state.lightbox && (
+          <ImageLightbox
+            src={this.state.lightbox.src}
+            alt={this.state.lightbox.alt}
+            onClose={() => this.setState({ lightbox: null })}
+          />
+        )}
+        {this.state.ultraplanLightbox && (
+          <ImageLightbox
+            src={this.state.ultraplanLightbox.src}
+            alt={this.state.ultraplanLightbox.alt}
+            zIndex={1200}
+            onClose={() => this.setState({ ultraplanLightbox: null })}
+          />
+        )}
       </div>
     );
   }

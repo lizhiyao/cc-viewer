@@ -289,6 +289,11 @@
   overflow: hidden;
   flex-shrink: 0;
   border: 1px solid var(--border-light);
+  transition: border-color 0.15s;
+}
+
+.imagePreviewItem:hover {
+  border-color: var(--color-primary-pale);
 }
 
 .imagePreviewThumb {
@@ -324,6 +329,15 @@
   opacity: 1;
 }
 
+@media (hover: none) {
+  .imagePreviewRemove,
+  .filePreviewClose {
+    opacity: 1;
+    min-width: 22px;
+    min-height: 22px;
+  }
+}
+
 .filePreviewChip {
   display: flex;
   align-items: center;
@@ -335,6 +349,11 @@
   flex-shrink: 0;
   max-width: 200px;
   color: var(--text-secondary);
+  transition: border-color 0.15s;
+}
+
+.filePreviewChip:hover {
+  border-color: var(--color-primary-pale);
 }
 
 .filePreviewChip svg {

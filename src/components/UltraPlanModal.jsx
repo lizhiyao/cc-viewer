@@ -1,13 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { t } from '../i18n';
 import { apiUrl } from '../utils/apiUrl';
 import { getModelMaxTokens } from '../utils/helpers';
+import ImageLightbox from './ImageLightbox';
+import ConfirmRemoveButton from './ConfirmRemoveButton';
 import styles from './UltraPlanModal.module.css';
 
 export default function UltraPlanModal({
   open, variant, prompt, files, modelName, agentTeamEnabled, customExperts,
   onClose, onVariantChange, onPromptChange, onSend, onUpload, onPaste, onRemoveFile, onOpenCustomEditor,
 }) {
+  const [lightbox, setLightbox] = useState(null);
   if (!open) return null;
 
   const hasContent = (prompt || '').trim() || files.length > 0;
@@ -92,16 +95,36 @@ export default function UltraPlanModal({
               <div className={styles.fileList}>
                 {files.map((f, i) => {
                   const isImage = /\.(png|jpe?g|gif|svg|bmp|webp|avif|ico|icns)$/i.test(f.name);
+                  const src = apiUrl(`/api/file-raw?path=${encodeURIComponent(f.path)}`);
                   return isImage ? (
                     <div key={i} className={styles.imageItem} title={f.name}>
-                      <img src={apiUrl(`/api/file-raw?path=${encodeURIComponent(f.path)}`)} className={styles.imageThumb} alt={f.name} />
-                      <button className={styles.imageRemove} onClick={() => onRemoveFile(i)}>&times;</button>
+                      <img
+                        src={src}
+                        className={styles.imageThumb}
+                        alt={f.name}
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); setLightbox({ src, alt: f.name }); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLightbox({ src, alt: f.name }); } }}
+                      />
+                      <ConfirmRemoveButton
+                        title={t('ui.chatInput.confirmRemoveImage')}
+                        onConfirm={() => onRemoveFile(i)}
+                        className={styles.imageRemove}
+                        ariaLabel={t('ui.chatInput.removeImage')}
+                      >&times;</ConfirmRemoveButton>
                     </div>
                   ) : (
                     <span key={i} className={styles.fileChip} title={f.name}>
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                       <span className={styles.fileName}>{f.name}</span>
-                      <span className={styles.fileRemove} onClick={() => onRemoveFile(i)}>&times;</span>
+                      <ConfirmRemoveButton
+                        title={t('ui.chatInput.confirmRemoveFile')}
+                        onConfirm={() => onRemoveFile(i)}
+                        className={styles.fileRemove}
+                        ariaLabel={t('ui.chatInput.removeImage')}
+                        tag="span"
+                      >&times;</ConfirmRemoveButton>
                     </span>
                   );
                 })}
@@ -129,6 +152,14 @@ export default function UltraPlanModal({
           </>
         )}
       </div>
+      {lightbox && (
+        <ImageLightbox
+          src={lightbox.src}
+          alt={lightbox.alt}
+          zIndex={1150}
+          onClose={() => setLightbox(null)}
+        />
+      )}
     </div>
   );
 }

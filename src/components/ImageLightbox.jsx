@@ -7,7 +7,7 @@ const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 10;
 const FADE_MS = 150;
 
-export default function ImageLightbox({ src, alt, onClose }) {
+export default function ImageLightbox({ src, alt, onClose, zIndex }) {
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -197,6 +197,7 @@ export default function ImageLightbox({ src, alt, onClose }) {
       role="dialog"
       aria-modal="true"
       aria-label={alt || 'Image preview'}
+      style={zIndex != null ? { zIndex } : undefined}
       onClick={handleOverlayClick}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
