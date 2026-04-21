@@ -19,6 +19,12 @@ export default defineConfig(() => {
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version),
     },
+    // xterm.js 6.0.0 的 InputHandler.requestMode 被 esbuild identifier mangler
+    // 误处理导致生产构建抛 ReferenceError。参考 issue #5800，关闭 identifier mangling
+    // 绕过，仅保留空格/语法压缩——体积损失<10%，远小于让用户跑到崩溃。
+    esbuild: {
+      minifyIdentifiers: false,
+    },
     build: {
       outDir: 'dist',
       rollupOptions: {

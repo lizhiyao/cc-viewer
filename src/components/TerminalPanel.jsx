@@ -18,6 +18,7 @@ import ConceptHelp from './ConceptHelp';
 import CustomUltraplanEditModal from './CustomUltraplanEditModal';
 import ImageLightbox from './ImageLightbox';
 import ConfirmRemoveButton from './ConfirmRemoveButton';
+import { resizeImageIfNeeded } from '../utils/imageResize';
 
 const darkTerminalTheme = {
   background: '#0a0a0a', foreground: '#d4d4d4', cursor: '#0a0a0a',
@@ -82,9 +83,12 @@ function AgentTeamIcon() {
 
 export async function uploadFileAndGetPath(file) {
   const MAX_SIZE = 100 * 1024 * 1024; // 100MB
-  if (file.size > MAX_SIZE) throw new Error('File too large (max 100MB)');
+  let upload = file;
+  // 图片压缩失败直接用原文件，保证上传流程不中断
+  try { upload = await resizeImageIfNeeded(file, 2000); } catch { upload = file; }
+  if (upload.size > MAX_SIZE) throw new Error('File too large (max 100MB)');
   const form = new FormData();
-  form.append('file', file);
+  form.append('file', upload);
   const res = await fetch(apiUrl('/api/upload'), { method: 'POST', body: form });
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || 'Upload failed');

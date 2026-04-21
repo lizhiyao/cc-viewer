@@ -3,6 +3,7 @@ import { t } from '../i18n';
 import { apiUrl } from '../utils/apiUrl';
 import { isImageFile } from '../utils/commandValidator';
 import { fetchAllRepos } from '../utils/gitApi';
+import { buildGitTree } from '../utils/gitTreeBuilder';
 import FullFileDiffView from './FullFileDiffView';
 import ImageLightbox from './ImageLightbox';
 import styles from './MobileGitDiff.module.css';
@@ -45,20 +46,6 @@ function getFolderIcon() {
       <path d="M2 6c0-1.1.9-2 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6z"/>
     </svg>
   );
-}
-
-function buildTree(changes) {
-  const root = { dirs: {}, files: [] };
-  for (const change of changes) {
-    const parts = change.file.split('/');
-    let node = root;
-    for (let i = 0; i < parts.length - 1; i++) {
-      if (!node.dirs[parts[i]]) node.dirs[parts[i]] = { dirs: {}, files: [] };
-      node = node.dirs[parts[i]];
-    }
-    node.files.push({ name: parts[parts.length - 1], status: change.status, fullPath: change.file });
-  }
-  return root;
 }
 
 function TreeDir({ name, node, depth, selectedFile, selectedRepo, repoPath, onFileClick }) {
@@ -208,7 +195,7 @@ export default function MobileGitDiff({ visible, onClose }) {
           {!loading && !error && repos && repos.map(repo => {
             const collapsed = collapsedRepos.has(repo.path);
             return isSingleRepo ? (
-              <TreeDir key={repo.path} name="" node={buildTree(repo.changes)} depth={0} selectedFile={selectedFile} selectedRepo={selectedRepo} repoPath={repo.path} onFileClick={handleFileClick} />
+              <TreeDir key={repo.path} name="" node={buildGitTree(repo.changes)} depth={0} selectedFile={selectedFile} selectedRepo={selectedRepo} repoPath={repo.path} onFileClick={handleFileClick} />
             ) : (
               <React.Fragment key={repo.path}>
                 <div
@@ -232,7 +219,7 @@ export default function MobileGitDiff({ visible, onClose }) {
                   <span className={styles.repoBadge}>{repo.changes.length}</span>
                 </div>
                 {!collapsed && (
-                  <TreeDir name="" node={buildTree(repo.changes)} depth={1} selectedFile={selectedFile} selectedRepo={selectedRepo} repoPath={repo.path} onFileClick={handleFileClick} />
+                  <TreeDir name="" node={buildGitTree(repo.changes)} depth={1} selectedFile={selectedFile} selectedRepo={selectedRepo} repoPath={repo.path} onFileClick={handleFileClick} />
                 )}
               </React.Fragment>
             );

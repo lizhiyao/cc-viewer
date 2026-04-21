@@ -4,6 +4,7 @@ import { t } from '../i18n';
 import { apiUrl } from '../utils/apiUrl';
 import { getFileIcon } from '../utils/fileIcons';
 import { fetchAllRepos } from '../utils/gitApi';
+import { buildGitTree } from '../utils/gitTreeBuilder';
 import styles from './GitChanges.module.css';
 
 const STATUS_COLORS = {
@@ -20,21 +21,6 @@ const STATUS_COLORS = {
 const STATUS_LABELS = {
   '??': 'U',
 };
-
-// 将扁平的文件变更列表构建为目录树
-function buildTree(changes) {
-  const root = { dirs: {}, files: [] };
-  for (const change of changes) {
-    const parts = change.file.split('/');
-    let node = root;
-    for (let i = 0; i < parts.length - 1; i++) {
-      if (!node.dirs[parts[i]]) node.dirs[parts[i]] = { dirs: {}, files: [] };
-      node = node.dirs[parts[i]];
-    }
-    node.files.push({ name: parts[parts.length - 1], status: change.status, fullPath: change.file });
-  }
-  return root;
-}
 
 function TreeDir({ name, node, depth, repoPath, onFileClick, onOpenFile, onRestore, selectedFile, selectedRepo }) {
   const dirNames = Object.keys(node.dirs).sort();
@@ -184,7 +170,7 @@ export default function GitChanges({ style, onClose, onFileClick, onOpenFile, re
         {!loading && !error && repos && repos.map(repo => {
           const collapsed = collapsedRepos.has(repo.path);
           return isSingleRepo ? (
-            <TreeDir key={repo.path} name="" node={buildTree(repo.changes)} depth={0} repoPath={repo.path} onFileClick={(rp, fp) => {
+            <TreeDir key={repo.path} name="" node={buildGitTree(repo.changes)} depth={0} repoPath={repo.path} onFileClick={(rp, fp) => {
               setSelectedFile(fp); setSelectedRepo(rp);
               onFileClick && onFileClick(rp, fp);
             }} onOpenFile={onOpenFile} onRestore={handleRestore} selectedFile={selectedFile} selectedRepo={selectedRepo} />
@@ -217,7 +203,7 @@ export default function GitChanges({ style, onClose, onFileClick, onOpenFile, re
                 <span className={styles.repoBadge}>{repo.changes.length}</span>
               </div>
               {!collapsed && (
-                <TreeDir name="" node={buildTree(repo.changes)} depth={1} repoPath={repo.path} onFileClick={(rp, fp) => {
+                <TreeDir name="" node={buildGitTree(repo.changes)} depth={1} repoPath={repo.path} onFileClick={(rp, fp) => {
                   setSelectedFile(fp); setSelectedRepo(rp);
                   onFileClick && onFileClick(rp, fp);
                 }} onOpenFile={onOpenFile} onRestore={handleRestore} selectedFile={selectedFile} selectedRepo={selectedRepo} />

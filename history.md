@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.6.192 (2026-04-21)
+
+- Fix (`/api/git-status` 新增目录在 diff 树显示为空文件名 + 插入行数 0): `server.js` 原 `git status --porcelain` 默认 `-unormal` 把新增目录收敛为 `?? dir/`（尾斜杠），前端 buildTree 取最后一段得空串渲染幽灵条目，`countUntrackedLines` 对目录返回 0 导致插入行数漏算。改用 `-uall` 展开到具体文件；加 `maxBuffer: 10MB` 防止超大 repo 输出被默认 1MB 截断；`MAX_UNTRACKED` 1000→5000 并新增 `insertions_capped` flag 通知前端数据被硬上限截断。前端 `GitChanges.jsx`/`MobileGitDiff.jsx` 两处 `buildTree` 抽到 `src/utils/gitTreeBuilder.js` 消除重复，加尾斜杠 `endsWith('/')` 跳过兜底——即便旧后端或未来回滚 `-uall` 也不会再误把目录当文件。
+- Fix (xterm.js 6.0.0 的 `InputHandler.requestMode` 被 esbuild 识别符压缩器误处理导致生产构建抛 `ReferenceError`，issue #5800): `vite.config.js` 加 `esbuild.minifyIdentifiers: false` 关掉变量名压缩（保留空格/语法压缩），绕过 TDZ bug。gzip 总量 +10~15%，相对「让 xterm 跑到崩溃」的代价值。后续等 xterm 6.1 稳定版修复后恢复。
+- Experiment removed (Markdown CM6 live preview 自研实验彻底删除): 首版稳定性远低于纯文本编辑（光标抖动、decoration 反复显隐、大文件性能），业界调研确认 Obsidian 是闭源自研、开源替代都未达稳定度，且 Dendron/Foam/LogSeq/Joplin 等主流 PKM 都放弃 live preview。对 cc-viewer（95% 看 / 5% 改）场景 ROI 为负。`src/codemirror/livePreview/` 整目录（9 文件 634 行）删除，`FileContentView.jsx` 恢复二态 `'markdown'`/`'text'` 切换（回到 v1.6.191 基线），`i18n.ui.viewLivePreview` × 18 语言删除，`package.json` 撤掉显式 `katex` dependency（仍作为 react-virtuoso 间接依赖留在 node_modules 但不进 bundle）。localStorage 残留的 `'livePreview'` 偏好因代码不再读取自动失效。
+- Quality: 公共 util 抽取（gitTreeBuilder），全量单测 989/989 通过。
+
+## 1.6.191 (2026-04-21)
+
+- Feature (图片上传前端尺寸压缩 — 2000px 上限): 手机端照片原图动辄 4000×3000 甚至更大，直接上传浪费带宽、服务器磁盘和后续 base64/vision 处理的 token。新增 `src/utils/imageResize.js` 导出 `resizeImageIfNeeded(file, maxDim=2000)`：非图片 / 非 PNG-JPEG-WebP / 解码失败一律原样返回；任一边超过 2000px 时按长边等比缩放到 2000px 以内，通过 `createImageBitmap` + `<canvas>` 完成，JPEG/WebP 用 0.92 质量、PNG 无损；如果压缩后反而比原文件大也回退原文件（避免劣化）。挂接点：`src/components/TerminalPanel.jsx:uploadFileAndGetPath` —— 这是 ChatInputBar 粘贴 / 文件选择器 / UltraPlan Popover / TerminalPanel pending strip 所有图片上传的唯一出口，单点改动覆盖全部 entry。`MAX_SIZE 100MB` 校验改为对压缩后的 upload 执行，压缩失败直接 catch 并 fallback，避免阻塞上传流程。FileExplorer `importFiles`（`/api/import-file`，把文件导入项目目录而非 chat）保持原样：这是显式的文件导入，用户期望原图。
+
 ## 1.6.190 (2026-04-21)
 
 - Fix (code-review team 发现 Popover guard 漏检 `lightbox` state): v1.6.190 初版只 guard 了 `ultraplanLightbox || ultraplanConfirming`，ux-stacking reviewer 指出若用户同时打开 UltraPlan Popover **和**终端底部 pending 图片条的 Lightbox（共用 `this.state.lightbox`，非 ultraplan 场景），点击 Lightbox 背景会误关 Popover。Popover `onOpenChange` guard 补加 `this.state.lightbox` 进去，三个 state 任一为真都拦截 Popover 关闭。

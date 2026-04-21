@@ -2289,7 +2289,11 @@ async function handleRequest(req, res) {
         res.end(JSON.stringify({ error: 'Invalid repo parameter', changes: [] }));
         return;
       }
-      const { stdout: output } = await execFileAsync('git', ['status', '--porcelain'], { cwd, encoding: 'utf-8', timeout: 5000 });
+      // `-uall` 让 git 把新增目录展开成具体文件，而不是收敛为 `?? path/`
+      // 否则前端树会把整个新目录当一个「空文件名」叶子渲染，且行数统计为 0。
+      // maxBuffer 拉到 10MB——默认 1MB 在 node_modules 未 gitignore 之类的极端
+      // 场景下会被截断，导致后续 split 解析错位。
+      const { stdout: output } = await execFileAsync('git', ['status', '--porcelain', '-uall'], { cwd, encoding: 'utf-8', timeout: 5000, maxBuffer: 10 * 1024 * 1024 });
       const lines = output.split('\n').filter(line => line.trim());
       const changes = lines.map(line => {
         const status = line.substring(0, 2).trim();
@@ -2324,17 +2328,22 @@ async function handleRequest(req, res) {
 
       // Cap untracked-file processing to keep the event loop responsive if a
       // repo forgets to gitignore a huge directory (e.g. node_modules).
-      const MAX_UNTRACKED = 1000;
+      // 超限时仍继续计数，但不再调 countUntrackedLines——用 insertions_capped
+      // 通知前端"此数据被硬上限截断"，避免静默少算给用户造成误判。
+      const MAX_UNTRACKED = 5000;
       let untrackedProcessed = 0;
+      let untrackedTotal = 0;
       for (const c of changes) {
         if (c.status !== '??') continue;
-        if (untrackedProcessed >= MAX_UNTRACKED) break;
+        untrackedTotal++;
+        if (untrackedProcessed >= MAX_UNTRACKED) continue;
         insertions += countUntrackedLines(cwd, c.file);
         untrackedProcessed++;
       }
+      const insertions_capped = untrackedTotal > MAX_UNTRACKED;
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ changes, insertions, deletions }));
+      res.end(JSON.stringify({ changes, insertions, deletions, insertions_capped }));
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message, changes: [] }));
