@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.198 (2026-04-23)
+
+- Fix (撤回 `CLAUDE_CODE_NO_FLICKER=1` 默认注入，保留 `DISABLE_MOUSE`): `pty-manager.js` 在 1.6.197 里给 `spawnClaude` / `spawnShell` 两处都默认加了 `env.X ??= '1'`，引入非预期副作用——`NO_FLICKER=1` 会把 Ink TUI **强制**切到 alt-screen buffer 渲染，官方文档和 issue [#41965](https://github.com/anthropics/claude-code/issues/41965) 已明确"销毁 terminal scrollback，只保留 ~2 页"，实测用户 cc-viewer xterm 面板打开**只显示一屏**，拖动窗口/分栏才因 SIGWINCH 重绘出现"冲突渲染"假象。这次只撤 `NO_FLICKER`（spawnClaude + spawnShell 两处），回归 Claude CLI 官方默认 main-buffer 渲染，xterm 3000 行 scrollback 恢复；xterm.js 6.x GPU/Canvas 合成能吸收绝大部分 flicker。**保留 `CLAUDE_CODE_DISABLE_MOUSE ??= '1'`**（经 5 agent code review 确认：alt-screen 销毁 scrollback 是 NO_FLICKER 的锅，和 DISABLE_MOUSE 无关；DISABLE_MOUSE 防止 Claude 启 SGR mouse tracking 抢走 xterm 鼠标事件，保住**文本选中/复制粘贴**这个硬需求）。**需要闪烁优化的用户自行 `export CLAUDE_CODE_NO_FLICKER=1` 再启 ccv**，`??=` 保留尊重用户 shell 偏好的语义。**需重启 ccv 进程**（pty-manager 改动前端热刷无效）。
+- Fix (`ChatInputBar.jsx` stop / send `<button>` 加 `type="button"`): 两个按钮此前缺 `type`，默认 `submit`；目前不在 `<form>` 内所以无实际误触，但防御式写法避免将来包进 form 时出问题。Code review oversight-reviewer 提出，已采纳。
+- Process note (诊断弯路 + 自省): 收到"chat 消息在 resize 后渲染两份"报告后最初误诊为 `ChatView.jsx` 增量缓存 race，改了 `_itemCacheToggleSig` 扩 layout 信号 + 删 `_sessionItemCache` 增量 else-if 分支 + 加 `window.__ccvDebug` 日志，跑 build 后用户复验"没有解决问题"并指引"之前的两个环境变量"。复盘时 5 agent 并行论证（env 历史 / 官方文档 / chat 数据源 / bug 桥接 / 修复预研）锁定 cc-viewer chat 数据源是 **JSONL → SSE → `delta-reconstructor`**，与 PTY stdout 解耦，env 变量不可能触 chat 重复；真正的症状"只一屏"直接由 alt-screen 的"无 scrollback"定义决定。ChatView.jsx 的错改已选择性 revert（仅保留和本 bug 无关的 `handleInputStop` 停止按钮连线 + `getChatScroller` 回调）。
+
 ## 1.6.197 (2026-04-22)
 
 > 整合 Skill 弹层新增 → chip 改 hover → Skill 管理 Modal → 动态装卸 CRUD 这一整条迭代链，叠加图片压缩/GIF 保护、终端 Shift+Enter、NO_FLICKER 渲染优化等修复，以及两轮 Code Review 的落地。

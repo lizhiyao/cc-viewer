@@ -2388,6 +2388,11 @@ class ChatView extends React.Component {
     if (this._ptyDebounceTimer) clearTimeout(this._ptyDebounceTimer);
   }
 
+  handleInputStop = () => {
+    if (!this._inputWs || this._inputWs.readyState !== WebSocket.OPEN) return;
+    this._inputWs.send(JSON.stringify({ type: 'input', data: '\x1b' }));
+  };
+
   handleInputSend = () => {
     const textarea = this._inputRef.current;
     if (!textarea) return;
@@ -3382,6 +3387,7 @@ class ChatView extends React.Component {
               onKeyDown={this.handleInputKeyDown}
               onChange={this.handleInputChange}
               onSend={this.handleInputSend}
+              onStop={this.handleInputStop}
               onSuggestionClick={this.handleSuggestionToTerminal}
               onUploadPath={this.handleUploadPath}
               presetItems={this.state.presetItems}
@@ -3469,6 +3475,7 @@ class ChatView extends React.Component {
                 onRemovePendingImage={this._removePendingImage}
                 onClearPendingImages={this._clearPendingImages}
                 modelName={this._reqScanCache?.modelName}
+                getChatScroller={() => this._getScrollContainer()}
                 />
               </div>
             </>

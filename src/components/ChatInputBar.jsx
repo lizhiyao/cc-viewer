@@ -19,7 +19,7 @@ const SPEECH_LANG_MAP = {
   tr: 'tr-TR', uk: 'uk-UA',
 };
 
-function ChatInputBar({ inputRef, inputEmpty, inputSuggestion, terminalVisible, onKeyDown, onChange, onSend, onSuggestionClick, onUploadPath, presetItems, onPresetSend, onOpenPresetModal, onOpenUltraPlan, onClearContext, isStreaming, streamingFading, pendingImages, onRemovePendingImage }) {
+function ChatInputBar({ inputRef, inputEmpty, inputSuggestion, terminalVisible, onKeyDown, onChange, onSend, onStop, onSuggestionClick, onUploadPath, presetItems, onPresetSend, onOpenPresetModal, onOpenUltraPlan, onClearContext, isStreaming, streamingFading, pendingImages, onRemovePendingImage }) {
   const [plusOpen, setPlusOpen] = useState(false);
   const [recording, setRecording] = useState(false);
   const [interimText, setInterimText] = useState('');
@@ -375,17 +375,32 @@ function ChatInputBar({ inputRef, inputEmpty, inputSuggestion, terminalVisible, 
                 </svg>
               </div>
             )}
-            <button
-              className={`${styles.sendBtn} ${inputEmpty && !(pendingImages?.length) ? styles.sendBtnDisabled : ''}`}
-              onClick={onSend}
-              disabled={inputEmpty && !(pendingImages?.length)}
-              title={t('ui.chatInput.send')}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="19" x2="12" y2="5" />
-                <polyline points="5 12 12 5 19 12" />
-              </svg>
-            </button>
+            {isStreaming && onStop ? (
+              <button
+                type="button"
+                className={styles.sendBtn}
+                onClick={onStop}
+                title={t('ui.chatInput.stop')}
+                aria-label={t('ui.chatInput.stop')}
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+                  <rect x="1" y="1" width="10" height="10" rx="1.5" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={`${styles.sendBtn} ${inputEmpty && !(pendingImages?.length) ? styles.sendBtnDisabled : ''}`}
+                onClick={onSend}
+                disabled={inputEmpty && !(pendingImages?.length)}
+                title={t('ui.chatInput.send')}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="19" x2="12" y2="5" />
+                  <polyline points="5 12 12 5 19 12" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
       </div>

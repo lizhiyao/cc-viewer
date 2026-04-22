@@ -309,6 +309,23 @@ class TerminalPanel extends React.Component {
       return true;
     });
 
+    // alt 屏（Claude Code Ink 等 TUI，buffer.hasScrollback=false）下，xterm 默认把 wheel
+    // 翻译成 ↑/↓ 发 PTY，Ink 输入会把它当作历史翻页。这里拦截：正常屏让 xterm 自己滚
+    // scrollback；alt 屏转发滚动到外层 chat scroller（Virtuoso），由 ChatView 通过
+    // getChatScroller prop 传入。祖先链上没有可滚元素，必须显式拿这个 sibling ref。
+    this.terminal.attachCustomWheelEventHandler((ev) => {
+      if (this.terminal?.buffer?.active?.type !== 'alternate') return true;
+      const scroller = this.props.getChatScroller?.();
+      if (scroller) {
+        const px = ev.deltaMode === 1 ? ev.deltaY * 16
+          : ev.deltaMode === 2 ? ev.deltaY * (scroller.clientHeight || 0)
+          : ev.deltaY;
+        scroller.scrollTop += px;
+      }
+      ev.preventDefault();
+      return false;
+    });
+
     this.terminal.onData((data) => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.ws.send(JSON.stringify({ type: 'input', data }));

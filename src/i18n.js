@@ -4692,6 +4692,26 @@ const i18nData = {
     "tr": "Gönder",
     "uk": "Надіслати"
   },
+  "ui.chatInput.stop": {
+    "zh": "停止",
+    "en": "Stop",
+    "zh-TW": "停止",
+    "ko": "중지",
+    "ja": "停止",
+    "de": "Stopp",
+    "es": "Detener",
+    "fr": "Arrêter",
+    "it": "Ferma",
+    "da": "Stop",
+    "pl": "Zatrzymaj",
+    "ru": "Стоп",
+    "ar": "إيقاف",
+    "no": "Stopp",
+    "pt-BR": "Parar",
+    "th": "หยุด",
+    "tr": "Durdur",
+    "uk": "Зупинити"
+  },
   "ui.chatInput.hintEnter": {
     "zh": "Enter 发送，Shift+Enter 换行",
     "en": "Enter to send, Shift+Enter for new line",
