@@ -3098,7 +3098,7 @@ export async function startViewer() {
                 }
                 return true;
               },
-              resolveSdkApproval: _sdkResolveApproval,
+              resolveSdkApproval: (...args) => _sdkResolveApproval?.(...args),
             },
           });
           resolve(server);
