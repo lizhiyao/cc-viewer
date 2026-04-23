@@ -3,7 +3,7 @@ import { Space, Tag, Button, Dropdown, Popover, Modal, Collapse, Drawer, Switch,
 import { MessageOutlined, FileTextOutlined, ImportOutlined, DashboardOutlined, ExportOutlined, DownloadOutlined, SettingOutlined, BarChartOutlined, CodeOutlined, CopyOutlined, ApiOutlined, DeleteOutlined, ReloadOutlined, PlusOutlined, CloudDownloadOutlined, SwapOutlined, EditOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { QRCodeCanvas } from 'qrcode.react';
 import { formatTokenCount, computeTokenStats, computeCacheRebuildStats, computeToolUsageStats, computeSkillUsageStats, getModelMaxTokens, extractCachedContent, parseCachedTools, extractLoadedSkills } from '../utils/helpers';
-import { BUILTIN_SKILL_NAMES } from '../utils/skillsParser';
+import { BUILTIN_SKILL_NAMES, mergeActiveSkills } from '../utils/skillsParser';
 import { isSystemText, classifyUserContent, isMainAgent } from '../utils/contentFilter';
 import { classifyRequest } from '../utils/requestType';
 import { resolveTeammateNames } from '../utils/contentFilter';
@@ -42,9 +42,13 @@ const LANG_OPTIONS = [
 class AppHeader extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { countdownText: '', promptModalVisible: false, promptData: [], promptViewMode: 'original', settingsDrawerVisible: false, globalSettingsVisible: false, projectStatsVisible: false, projectStats: null, projectStatsLoading: false, localUrl: '', pluginModalVisible: false, pluginsList: [], pluginsDir: '', deleteConfirmVisible: false, deleteTarget: null, processModalVisible: false, processList: [], processLoading: false, logoDropdownOpen: false, cacheHighlightIdx: null, cacheHighlightFading: false, cdnModalVisible: false, cdnUrl: '', cdnLoading: false, calibrationModel: (v => CALIBRATION_MODELS.some(m => m.value === v) ? v : 'auto')(localStorage.getItem('ccv_calibrationModel') || 'auto'), proxyModalVisible: false, editingProxy: null, editForm: { name: '', baseURL: '', apiKey: '', models: '', activeModel: '' }, logDirDraft: null, _skillsModal: { open: false, loading: false, skills: [], error: null, toggling: new Set() } };
+    this.state = { countdownText: '', promptModalVisible: false, promptData: [], promptViewMode: 'original', settingsDrawerVisible: false, globalSettingsVisible: false, projectStatsVisible: false, projectStats: null, projectStatsLoading: false, localUrl: '', pluginModalVisible: false, pluginsList: [], pluginsDir: '', deleteConfirmVisible: false, deleteTarget: null, processModalVisible: false, processList: [], processLoading: false, logoDropdownOpen: false, cacheHighlightIdx: null, cacheHighlightFading: false, cdnModalVisible: false, cdnUrl: '', cdnLoading: false, calibrationModel: (v => CALIBRATION_MODELS.some(m => m.value === v) ? v : 'auto')(localStorage.getItem('ccv_calibrationModel') || 'auto'), proxyModalVisible: false, editingProxy: null, editForm: { name: '', baseURL: '', apiKey: '', models: '', activeModel: '' }, logDirDraft: null, _skillsModal: { open: false, loading: false, skills: [], error: null, toggling: new Set() },
+      // 文件系统权威的 skill 列表（/api/skills 返回）；live-tail 下作为 popover chip 和管理弹窗的共享数据源。
+      // null=未加载 / false=失败 / [] 或 Array=加载结果。workspace 切换由 componentDidUpdate + seq 控制。
+      _fsSkills: null };
     this._countdownTimer = null;
     this._expiredTimer = null;
+    this._fsSkillsSeq = 0;
     this.updateCountdown = this.updateCountdown.bind(this);
   }
 
@@ -56,6 +60,8 @@ class AppHeader extends React.Component {
     fetch(apiUrl('/api/claude-settings')).then(r => r.json()).then(data => {
       if (data.model) this.setState({ settingsModel: data.model });
     }).catch(() => {});
+    // 预热：live-tail 下提前拉一次文件系统 skill，首次打开 popover 就是权威视图而非闪一下历史。
+    if (!this.props.isLocalLog) this.reloadFsSkills();
     // ipinfo.io 请求已移到 CountryFlag 组件里
   }
 
@@ -63,6 +69,49 @@ class AppHeader extends React.Component {
     if (prevProps.cacheExpireAt !== this.props.cacheExpireAt) {
       this.startCountdown();
     }
+    // Workspace 切换：projectName 变了 → 旧的 _fsSkills 属于旧项目，直接作废。
+    // 递增 seq 防止正在途中的 reload 回包把脏数据塞回 state。
+    if (prevProps.projectName !== this.props.projectName) {
+      // seq++ 杀掉任何在途的 reloadFsSkills（即使下面不再重启新的 fetch，也要确保旧回包不会写脏数据）
+      this._fsSkillsSeq++;
+      this.setState({ _fsSkills: null });
+      if (!this.props.isLocalLog && this.props.projectName) this.reloadFsSkills();
+    }
+  }
+
+  // 返回 { ok: true, skills } / { ok: false, reason: 'http:NNN' | 'network' | 'local_log' | 'stale' | <server msg> }。
+  // caller 应用返回值做下一步决策（setState 异步；await 后 this.state 可能还没 flush）。
+  // 失败时若已有过成功结果（_fsSkills 是数组）→ 保留不 clobber，避免 popover chip 从乐观态回退到历史态。
+  reloadFsSkills = async () => {
+    if (this.props.isLocalLog) return { ok: false, reason: 'local_log' };
+    const seq = ++this._fsSkillsSeq;
+    try {
+      const r = await fetch(apiUrl('/api/skills'));
+      const data = await r.json();
+      if (seq !== this._fsSkillsSeq) return { ok: false, reason: 'stale' };
+      if (!r.ok || !data.ok || !Array.isArray(data.skills)) {
+        const reason = (data && data.error) || `http:${r.status}`;
+        this.setState(prev => ({ _fsSkills: Array.isArray(prev._fsSkills) ? prev._fsSkills : false }));
+        return { ok: false, reason };
+      }
+      this.setState({ _fsSkills: data.skills });
+      return { ok: true, skills: data.skills };
+    } catch (e) {
+      if (seq === this._fsSkillsSeq) {
+        this.setState(prev => ({ _fsSkills: Array.isArray(prev._fsSkills) ? prev._fsSkills : false }));
+      }
+      return { ok: false, reason: e.message || 'network' };
+    }
+  };
+
+  // 把 reloadFsSkills 的 reason code 映射成用户可读文案。
+  // 未知/服务端自带的文案（例如 data.error 原样透传）直接显示。
+  getSkillsLoadErrorLabel(reason) {
+    if (!reason || reason === 'stale' || reason === 'local_log') return '';
+    const mHttp = /^http:(\d+)$/.exec(reason);
+    if (mHttp) return t('ui.skillsLoadError.http', { status: mHttp[1] });
+    if (reason === 'network') return t('ui.skillsLoadError.network');
+    return reason;
   }
 
   shouldComponentUpdate(nextProps, nextState) {
@@ -105,6 +154,9 @@ class AppHeader extends React.Component {
     if (this._cacheAutoFadeTimer) clearTimeout(this._cacheAutoFadeTimer);
     if (this._cacheHighlightDelayTimer) clearTimeout(this._cacheHighlightDelayTimer);
     this._cacheUnbindScrollFade();
+    // 让任何在途的 reloadFsSkills / fetch 回包 seq 校验失败 → 不会 setState 到已卸载组件。
+    // React 18 下 setState-on-unmounted 本身是静默 no-op，但明确标记更稳妥。
+    this._fsSkillsSeq++;
   }
 
   startCountdown() {
@@ -568,8 +620,11 @@ class AppHeader extends React.Component {
       this._lastSkills = extractLoadedSkills(requests);
       this._lastChosenForSkills = chosenForSkills;
     }
-    // 过滤掉 builtin skill（无法单独管理，用户见过一次就够了，留着只会占 chip 行）
-    const skills = (this._lastSkills || []).filter(s => !BUILTIN_SKILL_NAMES.has(s.name));
+    // Chip 数据源：优先走 /api/skills（文件系统权威，禁用立即生效；插件名带前缀符合 system-reminder 格式）。
+    // `_fsSkills` 为 null / false（本地 log / fetch 失败）时，回退到历史 system-reminder 解析 —— 不回归旧行为。
+    const historicalSkills = (this._lastSkills || []).filter(s => !BUILTIN_SKILL_NAMES.has(s.name));
+    const mergedSkills = mergeActiveSkills(this.state._fsSkills, this._lastSkills || []);
+    const skills = mergedSkills !== null ? mergedSkills : historicalSkills;
     const hasSkills = skills.length > 0;
 
     // 内置工具 chip：若有对应 Tool-<name>.md 文档（由 ConceptHelp 内部白名单校验），
@@ -1383,7 +1438,12 @@ class AppHeader extends React.Component {
                 trigger="hover"
                 placement="bottomLeft"
                 overlayInnerStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-hover)', borderRadius: 8, padding: '8px 8px' }}
-                onOpenChange={(open) => { this.setState({ _cachePopoverOpen: open }); if (!open) this._cacheScrollInited = false; }}
+                onOpenChange={(open) => {
+                  this.setState({ _cachePopoverOpen: open });
+                  if (!open) this._cacheScrollInited = false;
+                  // 首次打开 + 未加载 + live-tail → 拉一次文件系统权威数据
+                  if (open && this.state._fsSkills === null && !this.props.isLocalLog) this.reloadFsSkills();
+                }}
               >
                 <span className={styles.liveTag} style={{ borderColor: ctxColor, color: ctxColor }}>
                   <span className={styles.liveTagFill} style={{ width: `${contextPercent}%`, backgroundColor: ctxColor }} />
@@ -1865,26 +1925,29 @@ class AppHeader extends React.Component {
   }
 
   handleOpenSkillsModal = async () => {
+    // 复用已缓存的 _fsSkills；null（还没拉过）或 false（上次失败）都重拉一次。
+    // 不从 state 回读 reloadFsSkills 的结果 —— 用它的返回值（setState 异步、await 后 state 可能还没 flush）。
+    const cached = this.state._fsSkills;
+    const needFetch = !Array.isArray(cached);
     this.setState(prev => ({
       _skillsModal: {
         open: true,
-        loading: true,
-        skills: [],
+        loading: needFetch,
+        skills: Array.isArray(cached) ? cached : [],
         error: null,
         toggling: prev._skillsModal?.toggling || new Set(),
       },
       _cachePopoverOpen: false,
     }));
-    try {
-      const r = await fetch(apiUrl('/api/skills'));
-      const data = await r.json();
-      if (!r.ok || !data.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    if (needFetch) {
+      const result = await this.reloadFsSkills();
       this.setState(prev => ({
-        _skillsModal: { ...prev._skillsModal, loading: false, skills: data.skills, error: null },
-      }));
-    } catch (e) {
-      this.setState(prev => ({
-        _skillsModal: { ...prev._skillsModal, loading: false, skills: [], error: e.message || 'load_failed' },
+        _skillsModal: {
+          ...prev._skillsModal,
+          loading: false,
+          skills: result.ok ? result.skills : [],
+          error: result.ok ? null : result.reason,
+        },
       }));
     }
   };
@@ -1932,6 +1995,20 @@ class AppHeader extends React.Component {
         ? t('ui.skillEnabled', { name: skill.name })
         : t('ui.skillDisabled', { name: skill.name })
       );
+      // 乐观翻 _fsSkills 里这条的 enabled —— 如果后面 reloadFsSkills 失败，chip 也能立即反映用户动作，
+      // 不会退化到历史解析让用户以为操作没生效。reload 成功会用权威数据覆盖。
+      this.setState(prev => ({
+        _fsSkills: Array.isArray(prev._fsSkills)
+          ? prev._fsSkills.map(s => (s.source === skill.source && s.name === skill.name) ? { ...s, enabled: enable } : s)
+          : prev._fsSkills,
+      }));
+      // 重拉让 popover chip 和管理弹窗用权威数据一次性对齐。拉失败保留乐观值。
+      const result = await this.reloadFsSkills();
+      if (result.ok) {
+        this.setState(prev => ({
+          _skillsModal: { ...prev._skillsModal, skills: result.skills },
+        }));
+      }
     } catch (e) {
       // 网络异常也回滚
       this.setState(prev => ({
@@ -1965,7 +2042,7 @@ class AppHeader extends React.Component {
         {loading ? (
           <div className={styles.skillsEmpty}><Spin /></div>
         ) : error ? (
-          <div className={styles.skillsEmpty}>{t('ui.skillsLoadFailed', { reason: error })}</div>
+          <div className={styles.skillsEmpty}>{t('ui.skillsLoadFailed', { reason: this.getSkillsLoadErrorLabel(error) || error })}</div>
         ) : skills.length === 0 ? (
           <div className={styles.skillsEmpty}>{t('ui.noSkillsLoaded')}</div>
         ) : (

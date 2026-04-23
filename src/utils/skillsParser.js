@@ -5,6 +5,35 @@ export const BUILTIN_SKILL_NAMES = new Set([
   'loop', 'schedule', 'claude-api', 'init', 'review', 'security-review',
 ]);
 
+// 把 /api/skills 返回的 skill 对象映射到 Claude Code system-reminder 里的显示名。
+// 插件 skill: `<pluginShort>:<skillDir>`；其它源用裸名。pluginName 形如 `short@marketplace`。
+export function skillToDisplayName(s) {
+  if (!s || typeof s.name !== 'string') return '';
+  if (s.source === 'plugin' && typeof s.pluginName === 'string' && s.pluginName.includes('@')) {
+    const short = s.pluginName.split('@')[0];
+    if (short) return `${short}:${s.name}`;
+  }
+  return s.name;
+}
+
+// 把 /api/skills 的权威结果与历史 system-reminder 解析结果合并为「当前在用」chip 列表。
+// - fsSkills=null  → 返回 null，由调用方回退到历史解析
+// - 只保留 enabled=true 且非 builtin 的条目
+// - description 优先 fs（SKILL.md frontmatter），缺失时回退历史 system-reminder 的 desc，再缺则空串
+// - 按显示名去重（user/project 同名只保留最后一条；plugin 因为带前缀天然不冲突）
+export function mergeActiveSkills(fsSkills, historicalSkills) {
+  if (!Array.isArray(fsSkills)) return null;
+  const descMap = new Map((historicalSkills || []).map(s => [s.name, s.description]));
+  const out = new Map();
+  for (const s of fsSkills) {
+    if (!s || !s.enabled || s.source === 'builtin') continue;
+    const name = skillToDisplayName(s);
+    if (!name || BUILTIN_SKILL_NAMES.has(name)) continue;
+    out.set(name, { name, description: s.description || descMap.get(name) || '' });
+  }
+  return [...out.values()];
+}
+
 // 从 <system-reminder> 内部文本里抽出 skills 列表。
 // 识别 header 句 "skills are available for use with the Skill tool" 后，按行扫描
 // `- <name>: <desc>` 格式；name 内允许冒号（plugin:foo / skill-creator:skill-creator
