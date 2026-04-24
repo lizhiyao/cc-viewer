@@ -34,7 +34,9 @@ const ROOT_FILES = [
   'workspace-registry.js',
 ];
 
-// Recursively list .js files under a directory, excluding node_modules / dist.
+// Recursively list ESM source files under a directory, excluding node_modules / dist.
+// Covers .js/.mjs/.cjs — `.mjs` was missed in the first cut, causing lib/extract-plugin-name.mjs:12
+// to slip past 1.6.207 with a broken `file://${filePath}` template concat.
 function listJsFiles(dir) {
   if (!existsSync(dir)) return [];
   const out = [];
@@ -43,7 +45,7 @@ function listJsFiles(dir) {
     const full = join(dir, entry);
     const st = statSync(full);
     if (st.isDirectory()) out.push(...listJsFiles(full));
-    else if (entry.endsWith('.js') && !entry.endsWith('.test.js')) out.push(full);
+    else if (/\.[cm]?js$/.test(entry) && !/\.test\.[cm]?js$/.test(entry)) out.push(full);
   }
   return out;
 }
@@ -56,10 +58,12 @@ function listJsFiles(dir) {
 // We deliberately do NOT match `import.meta` or `new URL(import.meta.url)` etc.
 const DYNAMIC_IMPORT_RE = /(?:^|[^.\w])import\s*\(\s*([^'"`\s][^)]*)/g;
 
-// Check if a line (or the immediate surrounding lines) shows a safe wrapper.
-// Accept: pathToFileURL, file:// string concat, or explicit URL() construction.
+// Check if the import expression shows a safe wrapper. ONLY accept `pathToFileURL(` —
+// template-string concat like `` `file://${filePath}` `` is UNSAFE on Windows because it
+// produces `file://C:\...` (no third /, backslashes) instead of `file:///C:/...`.
+// `pathToFileURL` is the only API that normalizes correctly on both POSIX and Windows.
 function isSafelyWrapped(exprText) {
-  return /pathToFileURL|file:\/\//i.test(exprText);
+  return /pathToFileURL\s*\(/.test(exprText);
 }
 
 function scanFile(filePath) {
@@ -142,5 +146,16 @@ describe('windows-import-paths: dynamic import() must use pathToFileURL on absol
   it('regression scanner accepts pathToFileURL wrapper', () => {
     const safe = `await import(pathToFileURL(join(rootDir, 'foo.js')).href)`;
     assert.equal(isSafelyWrapped(safe), true, 'isSafelyWrapped rejected correctly-wrapped code');
+  });
+
+  // Explicitly regression-lock the pre-1.6.208 footgun: template-string `file://` concat
+  // is NOT considered safe because Windows produces malformed `file://C:\...` URLs.
+  it('regression scanner REJECTS `file://${path}` template concat as unsafe', () => {
+    const unsafeTemplate = 'await import(`file://${filePath}`)';
+    assert.equal(
+      isSafelyWrapped(unsafeTemplate),
+      false,
+      'template string file:// concat must be flagged — it produces malformed URL on Windows'
+    );
   });
 });
