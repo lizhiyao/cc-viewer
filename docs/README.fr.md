@@ -1,11 +1,12 @@
 # CC-Viewer
 
-Systeme de surveillance des requetes Claude Code, capturant et visualisant en temps reel toutes les requetes et reponses API (texte brut, sans troncature). Permet aux developpeurs de surveiller leur Context afin de faciliter la revue et le diagnostic lors du Vibe Coding.
-La derniere version de CC-Viewer propose egalement des solutions de deploiement serveur pour la programmation web, ainsi que des outils de programmation mobile. N'hesitez pas a l'utiliser dans vos projets ; davantage de fonctionnalites de plugins seront disponibles a l'avenir, avec prise en charge du deploiement cloud.
+Un kit d'outils Vibe Coding distillé de plus de 15 ans d'expérience en R&D dans l'industrie Internet, construit sur Claude Code :
 
-Commencons par la partie interessante -- voici ce que ca donne sur mobile :
-
-<img width="1700" height="790" alt="image" src="https://github.com/user-attachments/assets/da3e519f-ff66-4cd2-81d1-f4e131215f6c" />
+1. Exécutez /ultraPlan et /ultraReview localement, afin que votre code n'ait jamais à être entièrement exposé au cloud de Claude ;
+2. Permet la programmation mobile sur votre réseau local (extensible par l'utilisateur) ;
+3. Interception et analyse complètes du payload de Claude Code — idéal pour la journalisation, le débogage, l'apprentissage et la rétro-ingénierie ;
+4. Livré avec des notes d'étude accumulées et une expérience pratique (recherchez les icônes "?" dans toute l'application), afin que nous puissions explorer et grandir ensemble ;
+5. L'interface Web s'adapte à tous les modes de taille — intégrez-la dans des extensions de navigateur, des vues partagées du système d'exploitation et tout scénario d'intégration ; un installeur natif est également disponible.
 
 [English](../README.md) | [简体中文](./README.zh.md) | [繁體中文](./README.zh-TW.md) | [한국어](./README.ko.md) | [日本語](./README.ja.md) | [Deutsch](./README.de.md) | [Español](./README.es.md) | Français | [Italiano](./README.it.md) | [Dansk](./README.da.md) | [Polski](./README.pl.md) | [Русский](./README.ru.md) | [العربية](./README.ar.md) | [Norsk](./README.no.md) | [Português (Brasil)](./README.pt-BR.md) | [ไทย](./README.th.md) | [Türkçe](./README.tr.md) | [Українська](./README.uk.md)
 
@@ -17,214 +18,170 @@ Commencons par la partie interessante -- voici ce que ca donne sur mobile :
 npm install -g cc-viewer --registry=https://registry.npmjs.org
 ```
 
-### Mode programmation
+### Mode Programmation
 
-ccv est un substitut direct de claude -- tous les parametres sont transmis a claude, tout en demarrant le Web Viewer.
+ccv est un remplacement direct pour claude — tous les arguments sont transmis à claude tout en lançant le Web Viewer.
 
 ```bash
-ccv                    # == claude (mode interactif)
-ccv -c                 # == claude --continue (continuer la derniere conversation)
-ccv -r                 # == claude --resume (reprendre la conversation)
-ccv -p "hello"         # == claude --print "hello" (mode impression)
-ccv --d                # == claude --dangerously-skip-permissions (raccourci)
+ccv                    # == claude (interactive mode)
+ccv -c                 # == claude --continue (continue last conversation)
+ccv -r                 # == claude --resume (resume a conversation)
+ccv -p "hello"         # == claude --print "hello" (print mode)
+ccv --d                # == claude --dangerously-skip-permissions (shortcut)
 ccv --model opus       # == claude --model opus
 ```
 
-La commande que l'auteur utilise le plus souvent :
+La commande la plus utilisée par l'auteur est :
 ```
 ccv -c --d             # == claude --continue --dangerously-skip-permissions
 ```
 
-Une fois le mode programmation lance, la page web s'ouvre automatiquement.
+Après le lancement en mode programmation, une page Web s'ouvrira automatiquement.
 
-Vous pouvez utiliser Claude directement depuis la page web, tout en consultant les requetes completes et les modifications de code.
+CC-Viewer est également livré sous forme d'application de bureau native — récupérez la version pour votre plateforme depuis GitHub.
+[Page de téléchargement](https://github.com/weiesky/cc-viewer/releases)
 
-Et encore mieux : vous pouvez meme programmer depuis un appareil mobile !
 
+### Mode Logger
 
-### Mode journal
+Si vous préférez toujours l'outil natif claude ou l'extension VS Code, utilisez ce mode.
 
-⚠️ Si vous preferez toujours utiliser l'outil natif claude ou le plugin VS Code, utilisez ce mode.
+Dans ce mode, le lancement de `claude` démarrera automatiquement un processus de journalisation qui enregistre les journaux de requêtes dans ~/.claude/cc-viewer/*yourproject*/date.jsonl
 
-Dans ce mode, lancer ```claude``` ou ```claude --dangerously-skip-permissions```
-
-demarre automatiquement un processus de journalisation qui enregistre les journaux de requetes dans ~/.claude/cc-viewer/*votreprojet*/date.jsonl
-
-Demarrer le mode journal :
+Activer le mode logger :
 ```bash
 ccv -logger
 ```
 
-Lorsque le port specifique ne peut pas etre affiche dans la console, le premier port de demarrage par defaut est 127.0.0.1:7008. S'il y a plusieurs instances simultanees, les ports s'incrementent : 7009, 7010, etc.
+Lorsque la console ne peut pas imprimer le port spécifique, le premier port par défaut est 127.0.0.1:7008. Les instances multiples utilisent des ports séquentiels comme 7009, 7010.
 
-Cette commande detecte automatiquement le mode d'installation local de Claude Code (NPM ou Native Install) et s'adapte en consequence.
-
-- **Version NPM de Claude Code** : injecte automatiquement un script d'interception dans le fichier `cli.js` de Claude Code.
-- **Version Native de Claude Code** : detecte automatiquement le binaire `claude`, configure un proxy transparent local et met en place un Zsh Shell Hook pour rediriger le trafic automatiquement.
-- Ce projet recommande l'utilisation de Claude Code installe via NPM.
-
-Desinstaller le mode journal :
+Désinstaller le mode logger :
 ```bash
 ccv --uninstall
 ```
 
-### Depannage (Troubleshooting)
+### Dépannage
 
-Si vous rencontrez des problemes de demarrage, voici une solution ultime :
-Etape 1 : ouvrez Claude Code dans n'importe quel repertoire ;
-Etape 2 : donnez l'instruction suivante a Claude Code :
+Si vous rencontrez des problèmes lors du démarrage de cc-viewer, voici l'approche de dépannage ultime :
+
+Étape 1 : Ouvrez Claude Code dans n'importe quel répertoire.
+
+Étape 2 : Donnez à Claude Code l'instruction suivante :
+
 ```
-J'ai installe le package npm cc-viewer, mais apres avoir execute ccv, il ne fonctionne toujours pas correctement. Examine cli.js et findcc.js de cc-viewer, puis adapte-le au mode de deploiement local de Claude Code en fonction de l'environnement specifique. Limite autant que possible les modifications au fichier findcc.js.
+I have installed the cc-viewer npm package, but after running ccv it still doesn't work properly. Please check cc-viewer's cli.js and findcc.js, and adapt them to the local Claude Code deployment based on the specific environment. Keep the scope of changes as constrained as possible within findcc.js.
 ```
-Laisser Claude Code diagnostiquer lui-meme les erreurs est plus efficace que de consulter qui que ce soit ou de lire n'importe quelle documentation !
 
-Une fois l'instruction executee, findcc.js sera mis a jour. Si votre projet necessite frequemment un deploiement local, ou si le code forke doit souvent resoudre des problemes d'installation, conservez ce fichier -- vous pourrez simplement le copier la prochaine fois. A l'heure actuelle, de nombreux projets et entreprises n'utilisent pas Claude Code sur Mac mais via un deploiement serveur heberge, c'est pourquoi l'auteur a separe le fichier findcc.js pour faciliter le suivi des mises a jour du code source de cc-viewer.
+Laisser Claude Code diagnostiquer le problème lui-même est plus efficace que de demander à quiconque ou de lire toute documentation !
 
-### Autres commandes auxiliaires
+Une fois l'instruction ci-dessus terminée, `findcc.js` sera mis à jour. Si votre projet nécessite fréquemment un déploiement local, ou si le code forké doit souvent résoudre des problèmes d'installation, conserver ce fichier vous permet simplement de le copier la prochaine fois. À ce stade, de nombreux projets et entreprises utilisant Claude Code ne déploient pas sur Mac mais plutôt sur des environnements hébergés côté serveur, c'est pourquoi l'auteur a séparé `findcc.js` pour faciliter le suivi des mises à jour du code source de cc-viewer à l'avenir.
 
-Consulter l'aide :
+
+### Autres commandes
+
+Voir :
+
 ```bash
 ccv -h
 ```
 
-### Remplacement de configuration (Configuration Override)
+### Mode silencieux
 
-Si vous devez utiliser un point de terminaison API personnalise (par exemple un proxy d'entreprise), il suffit de le configurer dans `~/.claude/settings.json` ou de definir la variable d'environnement `ANTHROPIC_BASE_URL`. `ccv` le detectera automatiquement et transmettra correctement les requetes.
+Par défaut, `ccv` s'exécute en mode silencieux lorsqu'il encapsule `claude`, gardant votre sortie de terminal propre et cohérente avec l'expérience native. Tous les journaux sont capturés en arrière-plan et peuvent être consultés à `http://localhost:7008`.
 
-### Mode silencieux (Silent Mode)
-
-Par defaut, `ccv` fonctionne en mode silencieux lorsqu'il encapsule `claude`, garantissant que la sortie de votre terminal reste propre et coherente avec l'experience native. Tous les journaux sont captures en arriere-plan et consultables via `http://localhost:7008`.
-
-Une fois la configuration terminee, utilisez simplement la commande `claude` comme d'habitude. Accedez a `http://localhost:7008` pour consulter l'interface de surveillance.
+Une fois configuré, utilisez la commande `claude` normalement. Visitez `http://localhost:7008` pour accéder à l'interface de surveillance.
 
 
-## Version client
-
-CC-Viewer propose une version client de bureau que vous pouvez telecharger depuis GitHub :
-[Lien de telechargement](https://github.com/weiesky/cc-viewer/releases)
-La version client est actuellement en phase de test ; n'hesitez pas a nous faire part de vos retours en cas de probleme. Par ailleurs, l'utilisation de cc-viewer necessite que Claude Code soit installe localement.
-Il est important de noter que cc-viewer n'est qu'un « vetement » pour l'ouvrier (Claude Code). Sans Claude Code, le vetement ne peut pas fonctionner seul.
+## Fonctionnalités
 
 
-## Fonctionnalites
+### Mode Programmation
 
-
-### Mode programmation
-
-Apres avoir lance ccv, vous pouvez voir :
+Après le lancement avec ccv, vous pouvez voir :
 
 <img width="1500" height="765" alt="image" src="https://github.com/user-attachments/assets/ab353a2b-f101-409d-a28c-6a4e41571ea2" />
 
 
-Vous pouvez consulter directement le diff du code apres l'edition :
+Vous pouvez visualiser les différences de code directement après l'édition :
 
 <img width="1500" height="728" alt="image" src="https://github.com/user-attachments/assets/2a4acdaa-fc5f-4dc0-9e5f-f3273f0849b2" />
 
-Bien que vous puissiez ouvrir des fichiers et programmer manuellement, ce n'est pas recommande -- c'est de la programmation a l'ancienne !
+Bien que vous puissiez ouvrir des fichiers et du code manuellement, le codage manuel n'est pas recommandé — c'est du codage à l'ancienne !
 
 ### Programmation mobile
 
-Vous pouvez meme scanner un QR code pour programmer sur un appareil mobile :
+Vous pouvez même scanner un code QR pour coder depuis votre appareil mobile :
 
 <img width="3018" height="1460" alt="image" src="https://github.com/user-attachments/assets/8debf48e-daec-420c-b37a-609f8b81cd20" />
+<img width="1700" height="790" alt="image" src="https://github.com/user-attachments/assets/da3e519f-ff66-4cd2-81d1-f4e131215f6c" />
 
-Realisez vos reves de programmation mobile. De plus, un mecanisme de plugins est disponible -- si vous souhaitez personnaliser selon vos habitudes de programmation, vous pourrez suivre les mises a jour des hooks de plugins ulterieurement.
+Réalisez votre imagination de la programmation mobile. Il existe également un mécanisme de plugin — si vous avez besoin de personnaliser pour vos habitudes de codage, restez à l'affût des mises à jour des hooks de plugin.
 
-**Saisie vocale** : appuyez sur l'icone du microphone dans la zone de saisie du chat pour la reconnaissance vocale (Web Speech API ; necessite HTTPS ou localhost, le bouton est donc masque en acces LAN HTTP). Sur Android, utilisez la touche 🎤 integree de Gboard, et sur iOS la dictee systeme sur le clavier -- les deux fonctionnent hors ligne et sans HTTPS.
 
-### Mode journal (voir la session complete de Claude Code)
+### Mode Logger (Visualiser les sessions complètes de Claude Code)
 
 <img width="1500" height="768" alt="image" src="https://github.com/user-attachments/assets/a8a9f3f7-d876-4f6b-a64d-f323a05c4d21" />
 
 
-- Capture en temps reel de toutes les requetes API emises par Claude Code, garantissant le texte original, et non des journaux tronques (c'est tres important !!!)
-- Identification et marquage automatiques des requetes Main Agent et Sub Agent (sous-types : Plan, Search, Bash)
-- Les requetes MainAgent prennent en charge Body Diff JSON, affichage replie des differences avec la requete MainAgent precedente (uniquement les champs modifies/ajoutes)
-- Affichage en ligne de l'utilisation des Token pour chaque requete (Token d'entree/sortie, creation/lecture de cache, taux de succes)
-- Compatible avec Claude Code Router (CCR) et autres scenarios de proxy -- correspondance de secours des requetes via le modele de chemin API
+- Capture toutes les requêtes API de Claude Code en temps réel, garantissant du texte brut — pas des journaux caviardés (c'est important !!!)
+- Identifie et étiquette automatiquement les requêtes Main Agent et Sub Agent (sous-types : Plan, Search, Bash)
+- Les requêtes MainAgent prennent en charge Body Diff JSON, montrant les différences repliées par rapport à la requête MainAgent précédente (uniquement les champs modifiés/nouveaux)
+- Chaque requête affiche des statistiques d'utilisation des Tokens en ligne (tokens d'entrée/sortie, création/lecture de cache, taux de succès)
+- Compatible avec Claude Code Router (CCR) et d'autres scénarios de proxy — revient à la correspondance de modèle de chemin API
 
-### Mode conversation
+### Mode Conversation
 
-Cliquez sur le bouton "Mode conversation" en haut a droite pour visualiser l'historique complet de la conversation du Main Agent dans une interface de chat :
+Cliquez sur le bouton "Conversation Mode" dans le coin supérieur droit pour analyser l'historique complet des conversations du Main Agent dans une interface de chat :
 
 <img width="1500" height="764" alt="image" src="https://github.com/user-attachments/assets/725b57c8-6128-4225-b157-7dba2738b1c6" />
 
-
-- Ne prend pas encore en charge l'affichage de l'Agent Team
-- Messages utilisateur alignes a droite (bulle bleue), reponses du Main Agent alignees a gauche (bulle sombre)
-- Les blocs `thinking` sont replies par defaut, rendus en Markdown, cliquez pour developper et voir le processus de reflexion ; prise en charge de la traduction en un clic (fonctionnalite encore instable)
-- Les messages de choix utilisateur (AskUserQuestion) sont affiches sous forme de questions-reponses
-- Synchronisation bidirectionnelle des modes : lors du passage en mode conversation, positionnement automatique sur la conversation correspondant a la requete selectionnee ; lors du retour en mode brut, positionnement automatique sur la requete selectionnee
-- Panneau de parametres : permet de basculer l'etat de repli par defaut des resultats d'outils et des blocs de reflexion
-- Navigation de conversation sur mobile : en mode CLI mobile, cliquez sur le bouton "Navigation de conversation" dans la barre superieure pour faire glisser une vue de conversation en lecture seule et parcourir l'historique complet sur mobile
-
-### Outils statistiques
-
-Panneau flottant "Statistiques de donnees" dans la zone d'en-tete :
-
-<img width="1500" height="765" alt="image" src="https://github.com/user-attachments/assets/a3d2db47-eac3-463a-9b44-3fa64994bf3b" />
-
-- Affichage du nombre de cache creation/read et du taux de succes du cache
-- Statistiques de reconstruction du cache : par groupe de raisons (TTL, changement system/tools/model, troncature/modification de messages, changement de cle) avec nombre d'occurrences et tokens cache_creation
-- Statistiques d'utilisation des outils : frequence d'appel de chaque outil, triee par nombre d'appels
-- Statistiques d'utilisation des Skills : frequence d'appel de chaque Skill, triee par nombre d'appels
-- Prise en charge des statistiques de teammates
-- Icone d'aide conceptuelle (?) : cliquez pour consulter la documentation integree de MainAgent, CacheRebuild et de chaque outil
+- L'affichage Agent Team n'est pas encore pris en charge
+- Les messages de l'utilisateur sont alignés à droite (bulles bleues), les réponses du Main Agent sont alignées à gauche (bulles sombres)
+- Les blocs `thinking` sont repliés par défaut, rendus en Markdown — cliquez pour développer et voir le processus de pensée ; la traduction en un clic est prise en charge (la fonctionnalité est encore instable)
+- Les messages de sélection de l'utilisateur (AskUserQuestion) sont affichés au format Q&R
+- Synchronisation bidirectionnelle des modes : le passage en mode conversation défile automatiquement vers la conversation correspondant à la requête sélectionnée ; le retour en mode brut défile automatiquement vers la requête sélectionnée
+- Panneau de paramètres : basculez l'état de pliage par défaut pour les résultats d'outils et les blocs thinking
+- Navigation mobile des conversations : en mode CLI mobile, appuyez sur le bouton "Conversation Browse" dans la barre supérieure pour faire glisser une vue de conversation en lecture seule pour parcourir l'historique complet des conversations sur mobile
 
 ### Gestion des journaux
 
-Via le menu deroulant CC-Viewer en haut a gauche :
+Via le menu déroulant CC-Viewer dans le coin supérieur gauche :
+
 <img width="1500" height="760" alt="image" src="https://github.com/user-attachments/assets/33295e2b-f2e0-4968-a6f1-6f3d1404454e" />
 
-**Compression des logs**
-Concernant les logs, l'auteur tient a preciser qu'aucune definition officielle d'Anthropic n'a ete modifiee, afin de garantir l'integrite des logs.
-Cependant, etant donne que les logs individuels de 1M Opus peuvent devenir extremement volumineux en phase avancee, grace a certaines optimisations des logs MainAgent, l'auteur a pu reduire la taille d'au moins 66% sans gzip.
-La methode d'analyse de ces logs compresses peut etre extraite du depot actuel.
+**Compression des journaux**
+Concernant les journaux, l'auteur souhaite clarifier que les définitions officielles d'Anthropic n'ont pas été modifiées, garantissant l'intégrité des journaux. Cependant, comme les entrées de journal individuelles du modèle 1M Opus peuvent devenir extrêmement volumineuses dans les étapes ultérieures, grâce à certaines optimisations de journal pour MainAgent, une réduction de taille d'au moins 66 % est obtenue sans gzip. La méthode d'analyse pour ces journaux compressés peut être extraite du référentiel actuel.
 
-### Autres fonctionnalites utiles
+### Plus de fonctionnalités utiles
 
 <img width="1500" height="767" alt="image" src="https://github.com/user-attachments/assets/add558c5-9c4d-468a-ac6f-d8d64759fdbd" />
 
-Vous pouvez localiser rapidement votre prompt grace aux outils de la barre laterale
+Vous pouvez localiser rapidement vos prompts à l'aide des outils de la barre latérale.
 
----
+--- 
 
 <img width="1500" height="765" alt="image" src="https://github.com/user-attachments/assets/82b8eb67-82f5-41b1-89d6-341c95a047ed" />
 
-L'interessant KV-Cache-Text vous aide a voir ce que Claude voit reellement
+La fonction intéressante KV-Cache-Text vous permet de voir exactement ce que Claude voit.
 
 ---
 
 <img width="1500" height="765" alt="image" src="https://github.com/user-attachments/assets/54cdfa4e-677c-4aed-a5bb-5fd946600c46" />
 
-Vous pouvez telecharger des images et decrire vos besoins -- Claude a une excellente capacite de comprehension d'images. Et comme vous le savez, vous pouvez coller des captures d'ecran directement avec Ctrl+V ; le contenu complet s'affiche dans le dialogue
+Vous pouvez télécharger des images et décrire vos besoins — la compréhension des images de Claude est incroyablement puissante. Et comme vous le savez, vous pouvez coller des images directement avec Ctrl+V, et votre contenu complet sera affiché dans la conversation.
 
 ---
 
 <img width="600" height="370" alt="image" src="https://github.com/user-attachments/assets/87d332ea-3e34-4957-b442-f9d070211fbf" />
 
-Vous pouvez creer des plugins personnalises, gerer tous les processus de CC-Viewer et CC-Viewer offre le basculement a chaud d'interfaces tierces (oui, vous pouvez utiliser GLM, Kimi, MiniMax, Qwen, DeepSeek -- bien que l'auteur estime qu'ils sont encore assez faibles actuellement)
+Vous pouvez personnaliser les plugins, gérer tous les processus CC-Viewer, et CC-Viewer prend en charge le basculement à chaud vers des APIs tierces (oui, vous pouvez utiliser GLM, Kimi, MiniMax, Qwen, DeepSeek — bien que l'auteur les considère tous comme assez faibles à ce stade).
 
 ---
 
-
 <img width="1500" height="746" alt="image" src="https://github.com/user-attachments/assets/b1f60c7c-1438-4ecc-8c64-193d21ee3445" />
 
-D'autres fonctionnalites attendent d'etre decouvertes... par exemple : le systeme prend en charge Agent Team et integre un Code Reviewer. L'integration du Code Reviewer de Codex arrive bientot (l'auteur recommande vivement d'utiliser Codex pour faire du Code Review sur Claude Code)
+D'autres fonctionnalités attendent d'être découvertes... Par exemple : le système prend en charge Agent Team et dispose d'un Code Reviewer intégré. L'intégration de Codex Code Reviewer arrive bientôt (l'auteur recommande vivement d'utiliser Codex pour réviser le code de Claude Code).
 
-
-### Mise a jour automatique
-
-CC-Viewer verifie automatiquement les mises a jour au demarrage (une fois toutes les 4 heures maximum). Les mises a jour au sein d'une meme version majeure (par exemple 1.x.x -> 1.y.z) sont appliquees automatiquement et prennent effet au prochain demarrage. Les changements de version majeure affichent uniquement une notification.
-
-La mise a jour automatique suit la configuration globale de Claude Code `~/.claude/settings.json`. Si Claude Code a desactive les mises a jour automatiques (`autoUpdates: false`), CC-Viewer ignorera egalement la mise a jour automatique.
-
-### Support multilingue
-
-CC-Viewer prend en charge 18 langues, avec basculement automatique selon la langue du systeme :
-
-简体中文 | English | 繁體中文 | 한국어 | Deutsch | Español | Français | Italiano | Dansk | 日本語 | Polski | Русский | العربية | Norsk | Português (Brasil) | ไทย | Türkçe | Українська
-
-## License
+## Licence
 
 MIT
