@@ -1,3 +1,5 @@
+<img width="1500" height="150" alt="ccv" src="https://github.com/user-attachments/assets/433e79d4-8d55-4e3a-9efe-69bf4aa54426" />
+
 # CC-Viewer
 
 A Vibe Coding toolkit distilled from 15+ years of internet-industry R&D experience, built on top of Claude Code:
