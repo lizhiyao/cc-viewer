@@ -133,6 +133,47 @@ describe('formatToolAsXml', () => {
   });
 });
 
+describe('formatToolAsXml — raw text passthrough', () => {
+  it('keeps < > & in description as-is (no XML escape)', () => {
+    const tool = {
+      name: 'Compare',
+      description: 'Returns true when x < y && x > 0',
+      input_schema: { type: 'object', properties: {} },
+    };
+    const xml = formatToolAsXml(tool);
+    assert.match(xml, /<description>Returns true when x < y && x > 0<\/description>/);
+    assert.ok(!xml.includes('&lt;'), 'should not escape');
+    assert.ok(!xml.includes('&amp;'), 'should not escape');
+  });
+
+  it('keeps quotes and apostrophes in description as-is', () => {
+    const tool = {
+      name: 'Quote',
+      description: 'has "quotes" and \'apostrophes\'',
+      input_schema: { type: 'object', properties: {} },
+    };
+    const xml = formatToolAsXml(tool);
+    assert.match(xml, /<description>has "quotes" and 'apostrophes'<\/description>/);
+  });
+
+  it('first-match parser semantics: tool-level <name> resolved correctly even when description embeds literal <name>...</name>', () => {
+    // Even without escape, parseCachedTools' non-greedy /<name>([\s\S]*?)<\/name>/
+    // must pick the tool-level name, because <name> appears before <description>
+    // in the output structure.
+    const tool = {
+      name: 'RealName',
+      description: 'See also <name>FakeName</name> for context',
+      input_schema: { type: 'object', properties: {} },
+    };
+    const xml = formatToolAsXml(tool);
+    // The fake <name> stays raw in the output — that is intentional.
+    assert.ok(xml.includes('<name>FakeName</name>'), 'fake name preserved as raw text');
+    // But first-match still picks the tool-level RealName.
+    const firstNameMatch = xml.match(/<name>([\s\S]*?)<\/name>/);
+    assert.equal(firstNameMatch[1], 'RealName');
+  });
+});
+
 describe('formatToolsAsXml', () => {
   it('wraps multiple tools in a single <tools> block', () => {
     const xml = formatToolsAsXml([
