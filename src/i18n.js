@@ -2744,6 +2744,26 @@ const i18nData = {
     "tr": "Yükleniyor...",
     "uk": "Завантаження..."
   },
+  "ui.chunkOutdatedReloading": {
+    "zh": "页面资源已更新，正在自动刷新...",
+    "en": "Page resources updated, reloading...",
+    "zh-TW": "頁面資源已更新，正在自動重新整理...",
+    "ko": "페이지 리소스가 업데이트되었습니다. 새로고침 중...",
+    "ja": "ページのリソースが更新されました。再読み込み中...",
+    "de": "Seitenressourcen aktualisiert, wird neu geladen...",
+    "es": "Recursos de la página actualizados, recargando...",
+    "fr": "Ressources de la page mises à jour, rechargement...",
+    "it": "Risorse della pagina aggiornate, ricaricamento...",
+    "da": "Sideressourcer opdateret, genindlæser...",
+    "pl": "Zasoby strony zaktualizowane, ponowne ładowanie...",
+    "ru": "Ресурсы страницы обновлены, перезагрузка...",
+    "ar": "تم تحديث موارد الصفحة، جارٍ إعادة التحميل...",
+    "no": "Sideressurser oppdatert, laster på nytt...",
+    "pt-BR": "Recursos da página atualizados, recarregando...",
+    "th": "ทรัพยากรหน้าได้รับการอัปเดต กำลังโหลดใหม่...",
+    "tr": "Sayfa kaynakları güncellendi, yeniden yükleniyor...",
+    "uk": "Ресурси сторінки оновлено, перезавантаження..."
+  },
   "ui.save": {
     "zh": "保存",
     "en": "Save",

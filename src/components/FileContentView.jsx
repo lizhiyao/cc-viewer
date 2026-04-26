@@ -4,6 +4,7 @@ import { Modal, message } from 'antd';
 import { apiUrl } from '../utils/apiUrl';
 import { useMarkdownExport } from '../hooks/useMarkdownExport';
 import { detectMdExtensions } from '../utils/mdExtensionDetect';
+import { handleStaleChunk } from '../utils/lazyWithReload';
 import CodeMirror from '@uiw/react-codemirror';
 import { EditorView } from '@codemirror/view';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
@@ -28,8 +29,16 @@ import { renderMarkdown } from '../utils/markdown';
 import { isMobile } from '../env';
 import styles from './FileContentView.module.css';
 
-// 单独 chunk + 仅在打开 .md 文件时才加载，避免 ~850KB MDXEditor 进首屏
-const MdxEditorPanel = lazy(() => import('./MdxEditorPanel'));
+// 单独 chunk + 仅在打开 .md 文件时才加载，避免 ~850KB MDXEditor 进首屏。
+// chunk 失效自愈见 utils/lazyWithReload.js；onReload 在 reload 前 200ms 触发，
+// 给 antd toast 一帧时间画出来，让用户知道为啥页面突然刷。
+const MdxEditorPanel = lazy(() =>
+  import('./MdxEditorPanel').catch((err) =>
+    handleStaleChunk('MdxEditorPanel', err, {
+      onReload: () => message.warning(i18n('ui.chunkOutdatedReloading')),
+    }),
+  ),
+);
 
 // Feature flag：默认开；用户可在 devtools 里 localStorage.setItem('mdxEditorEnabled','false') 回退
 function readMdxFeatureFlag() {

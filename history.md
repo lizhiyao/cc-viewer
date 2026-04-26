@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.6.215 (2026-04-26) — 部署后陈旧 chunk 自愈：server cache + lazy reload
+
+### Fix — 部署后点 .md 文件偶现 "Failed to load module script" / "Failed to fetch dynamically imported module"
+
+**Bug**：用户截图报错链 `MdxEditorPanel-DopLe99x.js` MIME=text/html → strict MIME check 拒绝 → ESM 加载失败。grep 当前 dist 全无 `DopLe99x` 哈希，`MdxEditorPanel-CBnnOH_c.js` 才是真。
+
+**根因**：
+1. SPA + content-hashed chunks + lazy load。`npm publish 1.6.214` 后，`MdxEditorPanel` chunk 哈希从 `DopLe99x` 变到 `CBnnOH_c`。
+2. 服务端 `server.js:2934` 静态文件响应**没设任何缓存头**，浏览器用默认启发式缓存 → 用户升级 server 后浏览器还在用陈旧 `index.html` 引用旧 chunk 名。
+3. `server.js:2942` SPA fallback 不区分路径：找不到的 `/assets/*.js` 也回退给 `index.html` (`text/html`) → 浏览器 strict MIME 拒绝 → `import()` 抛 `TypeError: Failed to fetch dynamically imported module`。
+
+**修复（双层）**：
+
+**Server 层（杜绝问题源头）**：
+- `server.js:2934` 分桶 `Cache-Control`：
+  - `/assets/*` (内容哈希命名) → `public, max-age=31536000, immutable`（性能也提升）
+  - `index.html` 等 → `no-cache`（每次回源校验，禁止陈旧入口）
+- `server.js:2949` 新增短路：`/assets/*` 找不到时返回 `404 text/plain`（带提示），**不走** SPA fallback。否则浏览器拿到 `text/html` 当 ESM 加载会报 strict MIME，错误堆栈反而误导排查方向。
+
+**Client 层（陈旧标签页自愈）**：
+- 新增 `src/utils/lazyWithReload.js` 三层 API：
+  - `shouldReloadStaleChunk(name)` — primitive，仅判断 + 写时间戳。
+  - `reloadOnStaleChunk(name)` — 即时 reload（给 main.jsx 这种没 UI 的入口用）。
+  - `handleStaleChunk(name, err, { onReload })` — Suspense 友好：先跑 `onReload`（如 toast），200ms 后才真 reload，给 UI 一帧时间画出来；返回永不 resolve 的 Promise 让 React 卡在 fallback 直到 reload 接管。
+- 每个 chunk name 单独 `sessionStorage` timestamp，5 分钟时间窗内不重复 reload（连续两次升级时抛原 error 让上游处理，避免死循环）。
+- `sessionStorage` 访问全部 `try/catch` 兜住 SecurityError / QuotaExceededError（Safari Private / quota / sandboxed iframe / 严格 CSP）。
+- 接入：`src/main.jsx:14` 入口 chunk (`App` / `Mobile`) 命名空间隔离；`src/components/FileContentView.jsx:32` MDXEditor chunk 走 `handleStaleChunk` 带 antd toast 提示。
+
+**i18n**：
+- `src/i18n.js` 新增 `ui.chunkOutdatedReloading` × 18 语言。
+
+### 受影响文件
+
+- 新增：`src/utils/lazyWithReload.js`
+- 修改：`server.js` / `src/main.jsx` / `src/components/FileContentView.jsx` / `src/i18n.js`
+
 ## 1.6.214 (2026-04-26) — /clear 触发 Header 血条乐观重置 + MdxEditor light 白底 + 保存按钮高亮
 
 ### Feat — /clear 后 Header 上下文血条立即乐观重置到低位

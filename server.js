@@ -2931,19 +2931,34 @@ async function handleRequest(req, res) {
         const content = readFileSync(fullPath);
         const ext = extname(filePath);
         const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-        res.writeHead(200, { 'Content-Type': contentType });
+        // 缓存策略：/assets/ 下文件名带 content-hash，永远不变 → 长缓存 + immutable；
+        // 其它（主要 index.html）每次必须回源校验，否则用户升级 server 后浏览器还在用陈旧 index.html，
+        // 引用旧 hash chunk 找不到 → SPA fallback 给 text/html → 浏览器 strict MIME 拒绝。
+        const cacheControl = filePath.startsWith('/assets/')
+          ? 'public, max-age=31536000, immutable'
+          : 'no-cache';
+        res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': cacheControl });
         res.end(content);
         return;
       }
     } catch (err) {
-      // fall through to SPA fallback
+      // fall through
     }
 
-    // SPA fallback: 非 API/非静态文件请求返回 index.html
+    // /assets/ 下文件找不到 = 陈旧 chunk hash（部署后旧标签页请求被替换的文件名）。
+    // 直接 404，不走 SPA fallback —— 否则浏览器拿到 text/html 当 ESM 加载会报 strict MIME 错，
+    // 错误堆栈反而误导排查方向。客户端的 lazy().catch() 拿到这个 404 会自动 reload。
+    if (filePath.startsWith('/assets/')) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('Asset not found (likely a stale chunk after upgrade — please refresh)');
+      return;
+    }
+
+    // SPA fallback: 非 API/非静态文件请求返回 index.html（路由由前端处理）
     try {
       const indexPath = join(__dirname, 'dist', 'index.html');
       const html = readFileSync(indexPath, 'utf-8');
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
       res.end(html);
     } catch (err) {
       res.writeHead(404);
