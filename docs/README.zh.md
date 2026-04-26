@@ -2,12 +2,12 @@
 
 基于 Claude Code，蒸馏自身开发经验， 沉淀的 Vibe Coding 工具：
 
-1. 提供本地化运行/ultraPlan、/ultraReview的能力，提升Claude Code 能力上限，同时避免把项目代码完全暴露给Claude云端；
-2. 可以局域网内实现移动端编程(用户自行扩展)，web版本自适应各种尺寸模式，方便嵌入各种场景、包括浏览器插件，操作系统分屏中开发，同时提供native安装包；
-3. 提供claude code 完整报文拦截分析的能力，方便记录日志、分析问题、学习借鉴、逆向研发；
-4. 沉淀了很多学习资料以及开发经验（详见系统中各处的“?”中）；
-5. 仅对claude code 能力上增强，对内核无任何实质性修改，保持原生体验；
-6. 适配 deepseek-v4-*、GLM 5.1、Kimi K2.6，内置cc-switch能力，可以随时热切三方工具；
+1. 提升能力上限，可本地化运行/ultraPlan、/ultraReview，同时避免把项目代码完全暴露给Claude云端；
+2. 多端同时适配，可以实现移动端编程(局域网内)，web版本自适应各种尺寸模式，方便嵌入各种场景、包括浏览器插件、操作系统分屏，提供native安装包；
+3. 完整日志留痕，提供claude code 完整报文拦截分析的能力，方便记录日志、分析问题、学习借鉴、逆向研发；
+4. 学习经验分享，沉淀了很多学习资料以及开发经验（详见系统中各处的“?”中）；
+5. 保持原生体验，仅对claude code 能力上增强，对内核无任何实质性修改，保持原生体验；
+6. 适配三方模型，适配 deepseek-v4-*、GLM 5.1、Kimi K2.6，内置cc-switch能力，可以随时热切三方工具；
 
 [English](../README.md) | [繁體中文](./README.zh-TW.md) | [한국어](./README.ko.md) | [日本語](./README.ja.md) | [Deutsch](./README.de.md) | [Español](./README.es.md) | [Français](./README.fr.md) | [Italiano](./README.it.md) | [Dansk](./README.da.md) | [Polski](./README.pl.md) | [Русский](./README.ru.md) | [العربية](./README.ar.md) | [Norsk](./README.no.md) | [Português (Brasil)](./README.pt-BR.md) | [ไทย](./README.th.md) | [Türkçe](./README.tr.md) | [Українська](./README.uk.md)
 
