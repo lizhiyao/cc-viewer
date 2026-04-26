@@ -15,8 +15,8 @@
 
 ### 前提
 
-确保已经安装好nodejs 22.0.0+；[下载安装](https://nodejs.org)
-确保已经安装好claude code；[安装教程](https://github.com/anthropics/claude-code)
+- 确保已经安装好nodejs 22.0.0+；[下载安装](https://nodejs.org)
+- 确保已经安装好claude code；[安装教程](https://github.com/anthropics/claude-code)
 
 ### 安装ccv
 
