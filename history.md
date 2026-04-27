@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.218 (2026-04-27) — 工具栏快捷按钮 paste 块紧贴 \r 拆分修复（窗口失焦也能立即提交）
+
+- Fix (清空上下文 / 预设 / UltraPlan 在 cc-viewer 窗口失焦时停在 [Pasted text] 状态需再按 Enter): 原因：bracket paste 包裹和 `\r` 在同一次 PTY write 里到达，Claude CLI 的 Ink/React TUI 需要至少一帧渲染才能完成 paste→normal 状态切换，紧贴的 `\r` 在 paste 状态机未稳定时被吞或并入 paste 内容。窗口失焦时浏览器对 hidden/occluded tab 的 RAF 节流可能放大这个 race，让"看起来跟焦点相关"的体感更明显。前端→后端→PTY 全链路是 `ws.send` → `ptyProcess.write`，**实际跟 macOS 窗口焦点完全无关**。做法：`src/utils/ptyChunkBuilder.js` 新增 `buildBracketPasteSubmitChunks(content)` + `BRACKET_PASTE_SUBMIT_SETTLE_MS = 250` 常量，把 paste 块和 `\r` 拆成两 chunk；`TerminalPanel.jsx` 三处 callsite（`handlePresetSend` / `handleClearContext` / `handleUltraplanSend`）改走 `input-sequential` 通道；`pty-manager.js` 的 `writeToPtySequential` 把 `endsWith('\x1b[201~')` 检测加进 `isToggleOrSubmit` 同级，命中走 `settleMs`（而非硬编码 80ms），让后端在 paste 块写完后等 250ms 给 Ink 一帧渲染缓冲再写 `\r`。前端不能用 `setTimeout` 拆——Chrome 后台 tab 的 timer 节流到秒级；后端 Node 进程不受浏览器节流影响。`_handlePaste` 系统剪贴板路径不动（长 paste 显示 `[Pasted text]` 占位由用户决定何时 Enter 是预期 UX）。
+- Test (writeToPtySequential 延迟规则两个新单测): 正向——`['\x1b[200~/clear\x1b[201~', '\r']` 配 `settleMs:250` 时 paste-end → `\r` 间隔 ≥200ms；负向回归——`['a', 'b']` 配 `settleMs:500` 时间隔仍 <300ms（验证 inquirer 路径走 80ms 硬编码不被误命中，余量给慢 CI 的 setTimeout 抖动）。
+- Note (handleClearContext 乐观重置时机不变，但实际 /clear 落地慢 ~330ms): `props.onClearContextOptimistic?.()` 仍在 `ws.send` 之后同步调用，AppBase 的 `contextBarOptimistic` 立即把 Header 血条降到 `OPTIMISTIC_CLEAR_PERCENT`；新路径 PTY 真实写完 `\r` 比旧路径慢约 80+250=330ms，期间 SSE 推 context_window 也相应延迟。AppBase 既有 30s 兜底定时器（feat 1.6.214）覆盖此场景，无需额外修复，仅记录避免后续误判。
+- Known issue (input-sequential-done 与 ChatView listener 潜在竞态): server.js 完成 input-sequential 后会发 `{type:'input-sequential-done'}`，ChatView `_submitViaSequentialQueue` 监听这个消息处理 inquirer 回执。**实际经审查：ChatView 用 `_inputWs` 独立 socket，TerminalPanel 用 `this.ws`，server 只 send 回触发的那个 ws 不广播——架构上天然隔离**。仅当未来某天 ChatView 在同一 ws 内发起两次并发提交才会重现，目前不存在。给消息加 sender/messageId 字段超出本次 bug fix 范围，后续迭代再加。
+- Test / Build: `npm run test` 全绿；`npm run build` 通过。
+
 ## 1.6.217 (2026-04-27) — MdxEditor 解析失败自动降级到旧 marked + popupContainer 10px 占位 strip 修复 + UltraReview 重命名 + Force GUI Edit 锁解除 + 1-frame 红横幅闪烁抑制
 
 - Feature (MDXEditor 解析失败自动降级到旧 marked 渲染): 当 `.md` 内含 MDXEditor 解析不动的 mdast 节点（如 `<system-reminder>` 这类自定义 JSX 标签 → `mdxJsxFlowElement`），用户原本会看到红色 "Parsing of the following markdown structure failed" 横幅；本版接 MDXEditor 的 `onError({ error, source })` 回调，向上抛 `onParseError` 给父组件，`FileContentView.jsx` 新增 `mdxParseErrored` state 并并入 `useMdxEditor` 合取条件，触发后 `<MdxEditorPanel>` 卸载，回退到既有 `useLegacyPreview` 路径——和 `extensionDetected` 命中（mermaid / 公式 / 指令块）一致的 marked 渲染。每次切文件 `loadFileContent` 重置标志，单文件失败不污染兄弟文件。新增 i18n key `ui.mdEditor.parseFallbackToast` 18 语言。

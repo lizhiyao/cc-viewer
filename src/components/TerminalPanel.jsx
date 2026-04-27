@@ -13,6 +13,7 @@ import { isMobile, isIOS, isPad } from '../env';
 import styles from './TerminalPanel.module.css';
 import { BUILTIN_PRESETS } from '../utils/builtinPresets.js';
 import { buildLocalUltraplan } from '../utils/ultraplanTemplates';
+import { buildBracketPasteSubmitChunks, BRACKET_PASTE_SUBMIT_SETTLE_MS } from '../utils/ptyChunkBuilder';
 import { getModelMaxTokens } from '../utils/helpers';
 import ConceptHelp from './ConceptHelp';
 import CustomUltraplanEditModal from './CustomUltraplanEditModal';
@@ -953,16 +954,22 @@ class TerminalPanel extends React.Component {
     if (!description) return;
     this.setState({ agentTeamPopoverOpen: false });
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      // bracket paste mode 包裹让终端识别为一次粘贴，末尾 `\r` 让 TUI 直接提交，
-      // 不留在 `[Pasted text #N +M lines]` 状态要用户再按 Enter。对齐同文件 handleUltraplanSend 的做法。
-      this.ws.send(JSON.stringify({ type: 'input', data: `\x1b[200~${description}\x1b[201~\r` }));
+      this.ws.send(JSON.stringify({
+        type: 'input-sequential',
+        chunks: buildBracketPasteSubmitChunks(description),
+        settleMs: BRACKET_PASTE_SUBMIT_SETTLE_MS,
+      }));
     }
     if ((!isMobile || isPad) && this.terminal) this.terminal.focus();
   };
 
   handleClearContext = () => {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type: 'input', data: `\x1b[200~/clear\x1b[201~\r` }));
+      this.ws.send(JSON.stringify({
+        type: 'input-sequential',
+        chunks: buildBracketPasteSubmitChunks('/clear'),
+        settleMs: BRACKET_PASTE_SUBMIT_SETTLE_MS,
+      }));
       this.props.onClearContextOptimistic?.();
     }
     if ((!isMobile || isPad) && this.terminal) this.terminal.focus();
@@ -987,7 +994,11 @@ class TerminalPanel extends React.Component {
     if (!assembled) return;
     this.setState({ ultraplanOpen: false, ultraplanPrompt: '', ultraplanVariant: 'codeExpert', ultraplanFiles: [] });
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type: 'input', data: `\x1b[200~${assembled}\x1b[201~\r` }));
+      this.ws.send(JSON.stringify({
+        type: 'input-sequential',
+        chunks: buildBracketPasteSubmitChunks(assembled),
+        settleMs: BRACKET_PASTE_SUBMIT_SETTLE_MS,
+      }));
     }
     if ((!isMobile || isPad) && this.terminal) this.terminal.focus();
   };
