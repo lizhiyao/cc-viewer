@@ -1,3 +1,8 @@
+// ============================================================================
+// 主 terminal 组件 —— 渲染 Claude Code TUI 的"大 terminal"
+// 工具栏下方的"小/scratch terminal"是另外一个独立组件，见 ScratchTerminal.jsx
+// CSS：主 terminal 用 .terminalContainer + .terminalHost；scratch 用 .scratchInner + .scratchHost
+// ============================================================================
 import React from 'react';
 import { message, Tooltip, Popover, Popconfirm, Button, Checkbox, Modal } from 'antd';
 import { Terminal } from '@xterm/xterm';
@@ -1384,10 +1389,14 @@ class TerminalPanel extends React.Component {
     const { pendingImages, onRemovePendingImage } = this.props;
     return (
       <div className={styles.terminalPanel}>
+        {/* === 主 terminal (Claude Code TUI 渲染区) ===
+            外层 .terminalContainer：padding + focus 边线；内层 .terminalHost：xterm 实际父容器，
+            margin-bottom 4px 让 fitAddon 拿到的高度始终 -4px，xterm-screen 接触不到下方 toolbar */}
         <div
-          ref={this.containerRef}
           className={`${styles.terminalContainer}${this.state.terminalFocused ? ` ${styles.terminalContainerFocused}` : ''}`}
-        />
+        >
+          <div ref={this.containerRef} className={styles.terminalHost} />
+        </div>
         {pendingImages?.length > 0 && (
           <div className={styles.pendingFileStrip}>
             {pendingImages.map((img, i) => {

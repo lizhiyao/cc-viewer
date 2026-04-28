@@ -1,3 +1,8 @@
+// ============================================================================
+// scratch (小) terminal 组件 —— 工具栏下方的多 tab 临时 shell 面板
+// 区别于"主 terminal"（Claude Code TUI 渲染区，见 TerminalPanel.jsx）
+// CSS：scratch 用 .scratchInner + .scratchHost；主 terminal 用 .terminalContainer + .terminalHost
+// ============================================================================
 import React from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -214,7 +219,14 @@ class ScratchTerminal extends React.Component {
   };
 
   render() {
-    return <div ref={this.containerRef} className={styles.scratchInner} />;
+    // === scratch (小) terminal 渲染区 ===
+    // 外层 .scratchInner：focus 出血带；内层 .scratchHost：xterm 实际父容器，
+    // margin-bottom 4px 让 fitAddon 拿到的高度始终 -4px，xterm-screen 接触不到下方分隔线
+    return (
+      <div className={styles.scratchInner}>
+        <div ref={this.containerRef} className={styles.scratchHost} />
+      </div>
+    );
   }
 }
 

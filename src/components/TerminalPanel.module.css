@@ -8,7 +8,8 @@
   background: var(--bg-base-alt);
 }
 
-/* focus 边框用 inset box-shadow 替代 outline：
+/* ========== 主 terminal (Claude Code TUI 渲染区) — 归属 TerminalPanel.jsx ==========
+   focus 边框用 inset box-shadow 替代 outline：
    - outline 在 stacking 上属于元素自身装饰，绘制在 children 之下 → xterm 内部 absolute
      子元素 (.xterm-decoration-container 等) 在临界 layout 下会盖住 focus 边线
    - inset box-shadow 在 padding-box 边缘内画，stacking 高于 children，不会被遮 */
@@ -17,16 +18,26 @@
   /* 必需：xterm 内部 viewport (rows × charHeight) 作为 flex item 的 min-content，
      若不显式设 min-height:0，临界窗口高度下会撑大父容器，挤压底部 toolbar */
   min-height: 0;
-  /* 注意：box-sizing 必须保持默认 content-box（不能改 border-box）
-     fitAddon 用 parseInt(getComputedStyle().height) 读容器高度，border-box 模式下该值
-     含 padding，而 fitAddon 内部减的是 xterm.element 的 padding(=0)，会多算 padding/cellHeight 行
-     → 特定 height 下 rows × cellHeight > 实际 content area 触发 xterm 内部子元素溢出
-     业界共识：fitAddon 父容器必须用 content-box（默认） */
   overflow: hidden;
   padding: 4px 8px;
+  /* flex container：让内层 .terminalHost 走 flex:1 撑满，并以 margin-bottom 留出 buffer */
+  display: flex;
+  flex-direction: column;
   transition: box-shadow 0.3s ease-out;
   touch-action: none;
   overscroll-behavior: contain;
+}
+
+/* 主 terminal 的 xterm 实际父容器 (terminal.open() 接的 ref)：
+   margin-bottom 4px 让它比 .terminalContainer 内容区少 4px，fitAddon 通过
+   getComputedStyle().height 拿到的初始/refit 高度始终 -4px，cellHeight × rows
+   余数 + layout 抖动都被这层 buffer 兜住，xterm-screen 接触不到下方 toolbar 边线。
+   注意：scratch (小) terminal 用的是 .scratchInner + .scratchHost，不要混淆 */
+.terminalHost {
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 4px;
+  overflow: hidden;
 }
 
 .terminalContainerFocused {
@@ -627,19 +638,32 @@
 [data-theme="light"] .scratchWrap { background: #FFF; }
 [data-theme="dark"] .scratchWrap { background: #000; }
 
+/* ========== scratch (小) terminal — 归属 ScratchTerminal.jsx ==========
+   工具栏下方的多 tab 临时 shell 面板，区别于上面的主 .terminalContainer */
 .scratchInner {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  /* 4px transparent border 永远占位（focused 时由 .scratchPanesFocused .scratchPaneActive 选择器
-     切到主题色），是 box model 硬预留——xterm fitAddon 读 .scratchInner 的 content-box 高度时自动
-     扣除 border + padding，canvas 不可能画进这 4px 像素带。padding 8px 给 border 内边到 xterm 内容
-     再叠 8px 干净缓冲，亚像素抗锯齿也不会贴到 border。 */
+  /* 4px transparent border = focus 出血带 (focused 时切主题色) */
   border: 4px solid transparent;
-  padding: 8px;
+  /* flex container：让内层 .scratchHost 走 flex:1 撑满，并以 margin-bottom 留出 buffer */
+  display: flex;
+  flex-direction: column;
   touch-action: none;
   overscroll-behavior: contain;
   transition: border-color 0.3s ease-out;
+}
+
+/* scratch (小) terminal 的 xterm 实际父容器 (terminal.open() 接的 ref)：
+   margin-bottom 4px 让它比 .scratchInner 内容区少 4px，fitAddon 通过
+   getComputedStyle().height 拿到的初始/refit 高度始终 -4px。
+   .scratchHost 自身无 padding/border，绕开 antd 注入的 :where() box-sizing:border-box 影响。
+   注意：主 terminal 用的是 .terminalContainer + .terminalHost，不要混淆 */
+.scratchHost {
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 4px;
+  overflow: hidden;
 }
 
 .scratchPanesFocused .scratchPane.scratchPaneActive .scratchInner {
